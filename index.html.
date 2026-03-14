@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPM Services | Red Bull Clan</title>
+    <style>
+        :root {
+            --red-bull-blue: #000b49;
+            --red-bull-red: #ed1c24;
+            --red-bull-yellow: #ffcc00;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            background-color: #050505;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: linear-gradient(45deg, var(--red-bull-blue), #000);
+            padding: 40px 20px;
+            text-align: center;
+            border-bottom: 3px solid var(--red-bull-red);
+        }
+
+        .container { max-width: 900px; margin: auto; padding: 20px; }
+
+        h2 { text-align: center; color: var(--red-bull-yellow); text-transform: uppercase; letter-spacing: 2px; margin-top: 40px; }
+
+        /* AKCIJE */
+        .promo-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .promo-card {
+            background: linear-gradient(135deg, #1e1e1e, #111);
+            border: 2px solid var(--red-bull-red);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .promo-badge { background: var(--red-bull-red); padding: 5px 10px; border-radius: 5px; font-weight: bold; font-size: 12px; }
+
+        /* CENOVNIK */
+        .menu-box {
+            background: var(--glass);
+            border: 1px solid #333;
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #222;
+        }
+
+        .menu-item:last-child { border: none; }
+        .item-name { font-size: 17px; }
+        .item-price { color: var(--red-bull-yellow); font-weight: bold; font-size: 18px; }
+
+        /* KONTAKT SEKCIJA */
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .contact-card {
+            background: #111;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #222;
+            transition: 0.3s;
+            text-decoration: none;
+            color: white;
+        }
+
+        .contact-card:hover { border-color: var(--red-bull-yellow); background: #1a1a1a; }
+        .contact-card i { display: block; font-size: 24px; margin-bottom: 8px; color: var(--red-bull-red); }
+
+        /* FORMA */
+        .clan-box {
+            background: #0a0a0a;
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid var(--red-bull-blue);
+            margin-top: 50px;
+        }
+
+        input, textarea {
+            width: 100%; padding: 12px; margin: 10px 0;
+            background: #1a1a1a; border: 1px solid #333; color: white; border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            background: var(--red-bull-red);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn:hover { background: var(--red-bull-yellow); color: black; }
+
+        footer { text-align: center; margin-top: 50px; padding: 20px; font-size: 13px; color: #444; border-top: 1px solid #111; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 style="margin:0;">💎 CPM SERVICES</h1>
+    <p style="color: var(--red-bull-yellow); font-weight: bold;">RED BULL CLAN OFFICIAL SHOP</p>
+</header>
+
+<div class="container">
+
+    <h2>🔥 HOT DEALS</h2>
+    <div class="promo-container">
+        <div class="promo-card">
+            <span class="promo-badge">POPULAR</span>
+            <h3>FULL ACC BOOST</h3>
+            <p>50M + 500k Coins + King Rank</p>
+            <p style="font-size: 22px; color: var(--red-bull-yellow);">$3.50 <span style="text-decoration: line-through; color: #555; font-size: 16px;">$4.50</span></p>
+        </div>
+        <div class="promo-card">
+            <span class="promo-badge">SPEED</span>
+            <h3>DRAG PACK</h3>
+            <p>1695HP + Shift Time + Drift</p>
+            <p style="font-size: 22px; color: var(--red-bull-yellow); font-weight: bold;">$1.00 <span style="text-decoration: line-through; color: #555; font-size: 16px;">$1.50</span></p>
+        </div>
+    </div>
+
+    <h2>📊 CENOVNIK / MENU</h2>
+    <div class="menu-box">
+        <div class="menu-item"><span class="item-name">💵 Add Money</span> <span class="item-price">1$</span></div>
+        <div class="menu-item"><span class="item-name">🪙 Add Coins (max 500k)</span> <span class="item-price">1$</span></div>
+        <div class="menu-item"><span class="item-name">🚗 Premium Car (stock)</span> <span class="item-price">2$</span></div>
+        <div class="menu-item"><span class="item-name">⚙️ Custom HP</span> <span class="item-price">0.5$</span></div>
+        <div class="menu-item"><span class="item-name">⏱ Custom Shift Time</span> <span class="item-price">0.5$</span></div>
+        <div class="menu-item"><span class="item-name">🆔 Custom ID</span> <span class="item-price">5$</span></div>
+        <div class="menu-item"><span class="item-name">👑 KING Rank</span> <span class="item-price">2.5$</span></div>
+        <div class="menu-item"><span class="item-name">📧 Change Mail/Password</span> <span class="item-price">1.5$</span></div>
+        <div class="menu-item"><span class="item-name">🛸 UFO Car</span> <span class="item-price">1$</span></div>
+        <div class="menu-item"><span class="item-name">🌪 Custom Degree (Drift)</span> <span class="item-price">0.5$</span></div>
+        <div class="menu-item"><span class="item-name">📩 Change Mail/Password (CPM2)</span> <span class="item-price">1.5$</span></div>
+    </div>
+
+    <h2>📞 KONTAKT ZA NARUČIVANJE</h2>
+    <div class="contact-grid">
+        <a href="https://www.instagram.com/anonymo" class="contact-card">
+            <strong>📸 Instagram</strong><br>@anonymo
+        </a>
+        <a href="https://wa.me/381644545017" class="contact-card">
+            <strong>💬 WhatsApp</strong><br>+381 64 4545017
+        </a>
+        <a href="https://t.me/Anonymo123456" class="contact-card">
+            <strong>✈️ Telegram</strong><br>@Anonymo123456
+        </a>
+        <div class="contact-card">
+            <strong>🎮 Discord</strong><br>jovicc_23
+        </div>
+    </div>
+    <p style="text-align: center; color: #777; margin-top: 15px;">💳 Način plaćanja: <strong>PayPal</strong></p>
+
+    <div class="clan-box">
+        <h2 style="margin-top:0;">🐂 RED BULL CLAN PRIJAVA</h2>
+        <p style="text-align: center; color: #aaa;">Popuni formular i postani član Red Bull tima!</p>
+        <form action="https://formspree.io/f/VAŠ_ID" method="POST">
+            <input type="text" name="ign" placeholder="In-game Name (IGN)" required>
+            <input type="text" name="discord" placeholder="Discord Username (npr. jovicc_23)" required>
+            <input type="number" name="age" placeholder="Godište / Starost" required>
+            <textarea name="reason" placeholder="Zašto želiš u Red Bull klan?" rows="4" required></textarea>
+            <button type="submit" class="btn">POŠALJI PRIJAVU</button>
+        </form>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 CPM Services & Red Bull Clan. Sva prava zadržana.</p>
+    </footer>
+</div>
+
+</body>
+</html>
