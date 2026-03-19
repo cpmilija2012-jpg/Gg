@@ -23,6 +23,7 @@ def logo():
     print("\033[1;32m" + "="*45)
     print("      🚀 ANONYMO CPM SERVICE (OFFICIAL) 🚀      ")
     print("         INSTAGRAM: @anonymo.cpm              ")
+    print("         TELEGRAM: Anonymo123456              ")
     print("="*45 + "\033[0m")
 
 def loading_animation(text):
