@@ -1,7 +1,6 @@
 import requests
 import json
-import time
-from datetime import datetime
+import os
 
 # --- CONFIGURATION ---
 FIREBASE_API_KEY = 'AIzaSyBW1ZbMiUeDZHYUO2bY8Bfnf5rRgrQGPTM'
@@ -12,13 +11,16 @@ RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4
 BOT_TOKEN = "8691576277:AAG97ec5y9SmEPfWunG_GXwzbdRlPVWQd-s"
 CHAT_ID = 7183809303
 
+# ANSI Colors
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+CYAN = '\033[96m'
+WHITE = '\033[97m'
+RESET = '\033[0m'
+
 def send_to_telegram(message):
-    """Sends a notification to your Telegram bot."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message
-    }
+    payload = {"chat_id": CHAT_ID, "text": message}
     try:
         requests.post(url, json=payload, timeout=10)
     except:
@@ -37,9 +39,9 @@ def login(email, password):
     }
     try:
         response = requests.post(FIREBASE_LOGIN_URL, headers=headers, json=payload)
-        response_data = response.json()
-        if response.status_code == 200 and 'idToken' in response_data:
-            return response_data.get('idToken')
+        res_data = response.json()
+        if response.status_code == 200 and 'idToken' in res_data:
+            return res_data.get('idToken')
         return None
     except:
         return None
@@ -65,43 +67,55 @@ def set_rank(token):
     except:
         return False
 
-def show_menu():
-    print("\n" + "="*35)
-    print("      CPM KING RANK SERVICE")
-    print("="*35)
-    print("1. King Rank")
-    print("2. Exit")
-    print("="*35)
-    return input("Select an option: ")
+def show_banner():
+    os.system('clear')
+    print(f"{GREEN}##############################################")
+    print(f"#                                            #")
+    print(f"#        {WHITE}CAR PARKING MULTIPLAYER             {GREEN}#")
+    print(f"#           {YELLOW}KING RANK SERVICE                {GREEN}#")
+    print(f"#                                            #")
+    print(f"#        {CYAN}IG: @anonymo.cpm                    {GREEN}#")
+    print(f"#        {CYAN}Owner: @anonymo.cpm                 {GREEN}#")
+    print(f"#                                            #")
+    print(f"##############################################{RESET}")
+    print(f"\n{WHITE}----------------------------------------------{RESET}")
+    print(f"1. King Rank")
+    print(f"2. Exit")
+    print(f"{WHITE}----------------------------------------------{RESET}")
 
 def main_logic():
     while True:
-        choice = show_menu()
+        show_banner()
+        choice = input(f"{WHITE}Select an option: {RESET}")
         
         if choice == "1":
-            email = input("\nEmail: ").strip()
-            password = input("Password: ").strip()
+            email = input(f"{WHITE}Enter Email: {RESET}").strip()
+            password = input(f"{WHITE}Enter Password: {RESET}").strip()
             
-            print("\nConnecting to server...")
+            print(f"\n{YELLOW}Connecting to server...{RESET}")
             auth_token = login(email, password)
             
             if auth_token:
-                print("Applying King Rank...")
+                print(f"{CYAN}Applying King Rank...{RESET}")
                 if set_rank(auth_token):
-                    # Notify your bot about the successful update
                     log_msg = f"✅ Success: King Rank applied to {email}"
                     send_to_telegram(log_msg)
-                    print("Success! Your account now has King Rank.")
+                    print(f"{GREEN}Success! King Rank is now active.{RESET}")
+                    time.sleep(2)
                 else:
-                    print("Error: Could not apply rank.")
+                    print(f"\033[91mError: Could not update rank.{RESET}")
+                    time.sleep(2)
             else:
-                print("Login failed! Invalid credentials.")
+                print(f"\033[91mLogin failed! Check credentials.{RESET}")
+                time.sleep(2)
                 
         elif choice == "2":
-            print("Exiting tool... Goodbye!")
+            print(f"{YELLOW}Exiting...{RESET}")
             break
         else:
-            print("Invalid option. Please choose 1 or 2.")
+            print(f"\033[91mInvalid option.{RESET}")
+            time.sleep(1)
 
 if __name__ == "__main__":
+    import time
     main_logic()
