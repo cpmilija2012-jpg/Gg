@@ -18,7 +18,7 @@ ENDPOINTS = {
     "6": "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating6",
 }
 
-BOT_TOKEN = "8663420665:AAENhWlvRPuv_bjHEVE3tqseeWqgGOJLFB0"
+BOT_TOKEN = "8951462015:AAHDQX147lh4Y3a-af5tWR-1W5oPhXiaXTc"
 CHAT_ID = "8884756222"
 
 G = "\033[92m"
@@ -46,18 +46,14 @@ def banner():
     print(f"#        {W}CAR PARKING MULTIPLAYER             {G}#")
     print(f"#           {Y}KING RANK SERVICE                {G}#")
     print(f"#                                            #")
-    print(f"#        {C}IG: @anonymo.cpm                    {G}#")
-    print(f"#        {C}Owner: @anonymo.cpm                 {G}#")
+    print(f"#        {C}Instagram: ilija.jvcc                     {G}#")
+    print(f"#        {C}Telegram: @ILIJASELL               {G}#")
     print(f"#                                            #")
     print(f"##############################################{RE}")
     print()
     print(f"{W}----------------------------------------------{RE}")
-    print("1. King Rank (All Endpoints)")
-    print("2. SetUserRating1 Only")
-    print("3. SetUserRating2 Only")
-    print("4. SetUserRating5 Only")
-    print("5. SetUserRating6 Only")
-    print("6. Exit")
+    print("1. King Rank ")
+    print("2. Exit")
     print(f"{W}----------------------------------------------{RE}")
 
 def login(email, password):
@@ -87,7 +83,7 @@ def build_payload():
         "fuel", "offroad", "speed_banner", "reactions", "police", "run", "real_estate",
         "t_distance", "treasure", "block_post", "push_ups", "burnt_tire", "passanger_distance"
     ]}
-    rating_data["time"] = 1000000000
+    rating_data["time"] = 100000000
     rating_data["race_win"] = 3000000
     return {"data": json.dumps({"RatingData": rating_data})}
 
@@ -113,12 +109,12 @@ def set_rank(token, url, name):
     return False
 
 def send_all(token):
-    print(f"\n{Y}[*] Šaljem na sve endpointe...{RE}")
+    print(f"\n{Y}[*] Sending to all endpoints...{RE}")
     ok = 0
     for key, url in ENDPOINTS.items():
         if set_rank(token, url, f"SetUserRating{key}"):
             ok += 1
-    print(f"\n{G}[+] Uspješno: {ok}/{len(ENDPOINTS)} endpointa{RE}")
+    print(f"\n{G}[+] Success: {ok}/{len(ENDPOINTS)} endpoints{RE}")
     return ok == len(ENDPOINTS)
 
 # ─── MAIN ─────────────────────────────────────
@@ -128,7 +124,7 @@ def main():
         banner()
         choice = input(f"{W}Select an option: {RE}").strip()
 
-        if choice in ("1", "2", "3", "4", "5"):
+        if choice == "1":
             email = input(f"{W}Enter Email: {RE}").strip()
             password = input(f"{W}Enter Password: {RE}").strip()
 
@@ -143,15 +139,8 @@ def main():
             print(f"{G}[+] Login successful!{RE}")
             time.sleep(0.5)
 
-            if choice == "1":
-                if send_all(auth_token):
-                    send_telegram(f"✅ King Rank (All) applied to {email}")
-            else:
-                mapping = {"2": "1", "3": "2", "4": "5", "5": "6"}
-                key = mapping.get(choice, choice)
-                url = ENDPOINTS[key]
-                if set_rank(auth_token, url, f"SetUserRating{key}"):
-                    send_telegram(f"✅ SetUserRating{key} applied to {email}")
+            if send_all(auth_token):
+                send_telegram(f"✅ King Rank applied to {email}")
 
             print(f"\n{C}Press Enter to continue...{RE}")
             input()
