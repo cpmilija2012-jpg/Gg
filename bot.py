@@ -88,7 +88,7 @@ def build_payload():
         "t_distance", "treasure", "block_post", "push_ups", "burnt_tire", "passanger_distance"
     ]}
     rating_data["time"] = 1000000000
-    rating_data["race_win"] = 3000
+    rating_data["race_win"] = 3000000
     return {"data": json.dumps({"RatingData": rating_data})}
 
 def set_rank(token, url, name):
