@@ -46,8 +46,8 @@ from aiogram.types import (
 #  ⚙️  CONFIG
 # ═══════════════════════════════════════════
 
-BOT_TOKEN = "8951462015:AAHDQX147lh4Y3a-af5tWR-1W5oPhXiaXTc"
-OWNER_ID  = 8884756222
+BOT_TOKEN = "fuk fuk"
+OWNER_ID  = 😂😂😂🖕🖕🖕🖕
 
 RATE_LIMIT_ACTIONS = 10
 RATE_LIMIT_SECONDS = 60
@@ -1031,15 +1031,14 @@ class T:
     def welcome(name, username, uid):
         now = datetime.now()
         return (
-            f"{B}\n"
-            f"  CAR PARKING MULTIPLAYER\n"
-            f"  KING RANK SERVICE\n"
-            f"{B}\n\n"
-            f"  📸 Instagram: ilija.jvcc\n"
-            f"  📱 Telegram: @ILIJASELL\n\n"
-            f"  📋 Status: Active. Expires in 999 days\n"
-            f"  ({now.strftime('%Y-%m-%d %H:%M:%S')}).\n\n"
-            f"  Use /start to open menu."
+            f"{B}\n🔥 𝗣𝗥𝗜𝗠𝗢𝗖𝗣𝗠𝗧𝗢𝗢𝗟 🔥\n{B}\n\n"
+            f"  ╭──── 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 ────╮\n"
+            f"  │ 👤 {name}\n"
+            f"  │ 📱 @{username or 'N/A'}\n"
+            f"  │ 🆔 <code>{uid}</code>\n"
+            f"  │ 📅 {now.strftime('%d %b %Y • %I:%M %p')}\n"
+            f"  ╰─────────────────╯\n\n"
+            f"  ▸ Sign in with your CPM credentials"
         )
 
     @staticmethod
