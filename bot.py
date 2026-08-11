@@ -8,17 +8,14 @@
 FIREBASE_API_KEY="AIzaSyBW1ZbMiUeDZHYUO2bY8Bfnf5rRgrQGPTM"
 FIREBASE_LOGIN_URL="https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=${FIREBASE_API_KEY}"
 
-# Endpointi
 URL1="https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating1"
 URL2="https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating2"
 URL5="https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating5"
 URL6="https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating6"
 
-# Telegram (ostavi prazno ako ne želiš logove)
-BOT_TOKEN="8691576277:AAG97ec5y9SmEPfWunG_GXwzbdRlPVWQd-s"
-CHAT_ID="7183809303"
+BOT_TOKEN="8663420665:AAENhWlvRPuv_bjHEVE3tqseeWqgGOJLFB0"
+CHAT_ID="8884756222"
 
-# Boje
 G='\033[92m'
 Y='\033[93m'
 C='\033[96m'
@@ -26,14 +23,10 @@ W='\033[97m'
 R='\033[91m'
 RE='\033[0m'
 
-# ============================================
-# POMOĆNE FUNKCIJE
-# ============================================
-
 send_telegram() {
     local msg="$1"
-    if [ -n "8663420665:AAENhWlvRPuv_bjHEVE3tqseeWqgGOJLFB0 " ] && [ -n " 8884756222 " ]; then
-        curl -s -X POST "https://api.telegram.org/bot${8663420665:AAENhWlvRPuv_bjHEVE3tqseeWqgGOJLFB0 }/sendMessage" \
+    if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
             -H "Content-Type: application/json" \
             -d "{\"chat_id\":${CHAT_ID},\"text\":\"${msg}\"}" > /dev/null 2>&1
     fi
@@ -148,10 +141,6 @@ banner() {
     echo -e "6. Exit"
     echo -e "${W}----------------------------------------------${RE}"
 }
-
-# ============================================
-# GLAVNI PROGRAM
-# ============================================
 
 while true; do
     banner
