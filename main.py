@@ -1,4 +1,3 @@
-
 import asyncio
 import aiohttp
 import json
@@ -48,7 +47,7 @@ from aiogram.types import (
 # ═══════════════════════════════════════════
 
 BOT_TOKEN = "8951462015:AAHDQX147lh4Y3a-af5tWR-1W5oPhXiaXTc"
-OWNER_ID  = "8884756222"
+OWNER_ID  = 8884756222
 
 RATE_LIMIT_ACTIONS = 10
 RATE_LIMIT_SECONDS = 60
@@ -938,6 +937,9 @@ class CPMNuker:
     async def unlock_smoke(self, uid):
         return await self._set_floats(uid, [(33, 1.0)])
 
+    async def unlock_houses(self, uid):
+        return await self._set_floats(uid, [(0, 1.0), (1, 1.0), (2, 1.0)])
+
     async def unlock_animations(self, uid):
         await self.load(uid)
         td    = self.get_token_data(uid)
@@ -969,7 +971,6 @@ class CPMNuker:
         d     = deepcopy(self.get_record(uid, email))
         if not d or not d.get("Name"):
             return {"ok": False, "message": "Could not load account data."}
-        # Dodaj ID-jeve automobila (1-250 pokriva sve trenutne modele u CPM)
         d["fcar"] = list(set(d.get("fcar", []) + list(range(1, 250))))
         return await self._save(uid, d)
 
@@ -1789,6 +1790,7 @@ FEAT_MAP = {
     "f_houses": ("🏠 Houses",        nuker.unlock_houses),
     "f_levels": ("🎮 All Levels",    nuker.complete_all_levels),
     "f_rank":   ("🏅 Max Rank",      nuker.set_rank),
+    "f_cars":   ("🚗 All Cars",      nuker.unlock_all_cars),
 }
 
 
@@ -2215,8 +2217,6 @@ async def p_kick(msg: Message, state: FSMContext):
     await state.clear()
     store_remove_user(uid); nuker.delete_token(uid)
     admin_log(msg.from_user.id,"KICKED",str(uid))
-    try: await bot.send_message(uid, hdr("👢","𝗞𝗜𝗖𝗞𝗘𝗗")+"\n\n  Access removed.")
-    except: pass
     await msg.answer(f"  👢 <code>{uid}</code> kicked!", reply_markup=K.back_admin())
 
 
@@ -2224,7 +2224,7 @@ async def p_kick(msg: Message, state: FSMContext):
 async def cb_a_expiry(cb: CallbackQuery, state: FSMContext):
     if not has_admin(cb.from_user.id,"admin"): await cb.answer("✗",show_alert=True); return
     await state.set_state(SAdmin.expiry_id)
-    await cb.message.edit_text(hdr("⏰","𝗦𝗘𝗧 𝗘𝗫𝗣𝗜𝗥𝗬")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
+    await cb.message.edit_text(hdr("⏰","𝗘𝗫𝗣𝗜𝗥𝗬")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -2232,33 +2232,31 @@ async def cb_a_expiry(cb: CallbackQuery, state: FSMContext):
 async def p_expiry_id(msg: Message, state: FSMContext):
     try: uid = int(msg.text.strip())
     except: await msg.answer("  ✗ Invalid ID."); return
-    await state.update_data(target=uid)
+    await state.update_data(exp_uid=uid)
     await state.set_state(SAdmin.expiry_dy)
-    await msg.answer(f"  Enter days for <code>{uid}</code> (0 = remove):", reply_markup=K.back_admin())
+    await msg.answer("  Enter number of days (or 0 to remove):", reply_markup=K.back_admin())
 
 
 @rt.message(SAdmin.expiry_dy)
 async def p_expiry_dy(msg: Message, state: FSMContext):
-    try: days = int(msg.text.strip()); assert days >= 0
-    except: await msg.answer("  ✗ Invalid."); return
-    d   = await state.get_data(); uid = d.get("target")
+    try: days = int(msg.text.strip())
+    except: await msg.answer("  ✗ Invalid number of days."); return
+    data = await state.get_data()
+    uid  = data.get("exp_uid")
     await state.clear()
-    if days == 0:
+    if days <= 0:
         store_remove_expiry(uid)
-        await msg.answer(f"  ✔ Expiry removed for <code>{uid}</code>", reply_markup=K.back_admin())
+        await msg.answer(f"  ⏰ Expiry removed for <code>{uid}</code>", reply_markup=K.back_admin())
     else:
         store_set_expiry(uid, days)
-        admin_log(msg.from_user.id,f"EXPIRY_{days}d",str(uid))
-        try: await bot.send_message(uid, f"  ⏰ Access expires in {days} days.")
-        except: pass
-        await msg.answer(f"  ✔ <code>{uid}</code> expires in {days} days", reply_markup=K.back_admin())
+        await msg.answer(f"  ⏰ Expiry set to {days} days for <code>{uid}</code>", reply_markup=K.back_admin())
 
 
 @rt.callback_query(F.data == "a_profile")
 async def cb_a_profile(cb: CallbackQuery, state: FSMContext):
     if not has_admin(cb.from_user.id,"admin"): await cb.answer("✗",show_alert=True); return
     await state.set_state(SAdmin.profile_id)
-    await cb.message.edit_text(hdr("ℹ","𝗨𝗦𝗘𝗥 𝗣𝗥𝗢𝗙𝗜𝗟𝗘")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
+    await cb.message.edit_text(hdr("ℹ","𝗣𝗥𝗢𝗙𝗜𝗟𝗘")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -2267,36 +2265,27 @@ async def p_profile_id(msg: Message, state: FSMContext):
     try: uid = int(msg.text.strip())
     except: await msg.answer("  ✗ Invalid ID."); return
     await state.clear()
-    info  = STORE.get("users",{}).get(str(uid),{})
-    name  = info.get("name","Unknown")
-    un    = info.get("username","N/A")
-    last  = info.get("last_seen","N/A")[:16].replace("T"," ")
-    role  = ADMINS.get(uid,"user")
-    vip   = "💎 Yes" if uid in VIP_USERS else "No"
-    st    = "🚫 Banned" if uid in BANNED else ("✔ Allowed" if uid in ALLOWED_USERS else "⏳ Pending")
-    exp   = EXPIRY.get(str(uid),"None")
-    if exp != "None":
-        try: exp = datetime.fromisoformat(exp).strftime("%d %b %Y")
-        except: pass
-    warns = store_get_warnings(uid)
-    note  = store_get_note(uid)
-    txt   = (
-        f"{B}\n  ℹ  𝗣𝗥𝗢𝗙𝗜𝗟𝗘\n{B}\n\n"
-        f"  👤 Name:     {name}\n"
-        f"  📱 Username: @{un}\n"
-        f"  🆔 ID:       <code>{uid}</code>\n"
-        f"  📊 Status:   {st}\n"
-        f"  🛡 Role:     {role}\n"
-        f"  💎 VIP:      {vip}\n"
-        f"  ⏰ Expiry:   {exp}\n"
-        f"  📅 Last:     {last}\n"
-        f"  ⚠ Warns:    {len(warns)}/3"
+    uinfo = STORE.get("users",{}).get(str(uid),{})
+    role  = admin_role(uid) or "User"
+    vip   = "Yes" if is_vip(uid) else "No"
+    allowed = "Yes" if is_allowed(uid) else "No"
+    banned  = "Yes" if is_banned(uid) else "No"
+    td    = nuker.get_token_data(uid)
+    email = td.get("email","None") if td else "None"
+    
+    txt = (
+        f"{B}\n  👤  𝗣𝗥𝗢𝗙𝗜𝗟𝗘 𝗜𝗡𝗙𝗢\n{B}\n\n"
+        f"  🆔 ID:        <code>{uid}</code>\n"
+        f"  👤 Name:      {uinfo.get('name','N/A')}\n"
+        f"  📱 Username:  @{uinfo.get('username','N/A')}\n"
+        f"  📧 CPM Email: {email}\n"
+        f"  👑 Role:      {role}\n"
+        f"  💎 VIP:       {vip}\n"
+        f"  ✅ Allowed:   {allowed}\n"
+        f"  🚫 Banned:    {banned}\n"
     )
-    if note: txt += f"\n  📝 Note: {note}"
     await msg.answer(txt, reply_markup=K.back_admin())
 
-
-# ── VIP ───────────────────────────────────
 
 @rt.callback_query(F.data == "a_addvip")
 async def cb_a_addvip(cb: CallbackQuery, state: FSMContext):
@@ -2311,9 +2300,8 @@ async def p_addvip(msg: Message, state: FSMContext):
     try: uid = int(msg.text.strip())
     except: await msg.answer("  ✗ Invalid ID."); return
     await state.clear()
-    store_add_vip(uid); admin_log(msg.from_user.id,"ADD_VIP",str(uid))
-    try: await bot.send_message(uid, "  💎 You are now VIP!")
-    except: pass
+    store_add_vip(uid)
+    admin_log(msg.from_user.id,"ADD_VIP",str(uid))
     await msg.answer(f"  💎 <code>{uid}</code> is now VIP!", reply_markup=K.back_admin())
 
 
@@ -2321,7 +2309,7 @@ async def p_addvip(msg: Message, state: FSMContext):
 async def cb_a_rmvip(cb: CallbackQuery, state: FSMContext):
     if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
     await state.set_state(SAdmin.rmvip)
-    await cb.message.edit_text(hdr("💎","𝗥𝗘𝗠 𝗩𝗜𝗣")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
+    await cb.message.edit_text(hdr("💎","𝗥𝗘𝗠𝗢𝗩𝗘 𝗩𝗜𝗣")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -2331,142 +2319,15 @@ async def p_rmvip(msg: Message, state: FSMContext):
     except: await msg.answer("  ✗ Invalid ID."); return
     await state.clear()
     store_remove_vip(uid)
-    await msg.answer(f"  ✔ VIP removed for <code>{uid}</code>", reply_markup=K.back_admin())
+    admin_log(msg.from_user.id,"RM_VIP",str(uid))
+    await msg.answer(f"  💎 VIP status removed for <code>{uid}</code>", reply_markup=K.back_admin())
 
-
-# ═══════════════════════════════════════════
-#  🖼 UPLOAD PHOTO (Owner only)
-# ═══════════════════════════════════════════
-
-@rt.callback_query(F.data == "a_photo")
-async def cb_a_photo(cb: CallbackQuery, state: FSMContext):
-    if not has_admin(cb.from_user.id,"owner"):
-        await cb.answer("✗ Owner only!", show_alert=True); return
-    await state.set_state(SAdmin.upload_photo)
-    current = get_bot_photo()
-    txt = f"{B}\n  🖼  𝗨𝗣𝗗𝗔𝗧𝗘 𝗕𝗢𝗧 𝗣𝗛𝗢𝗧𝗢\n{B}\n\n"
-    if current:
-        txt += "  ◆ Current photo is set.\n\n"
-    txt += "  Send a new photo to update it.\n  This photo shows on welcome screen."
-    await cb.message.edit_text(txt, reply_markup=K.back_admin())
-    await cb.answer()
-
-
-@rt.message(SAdmin.upload_photo, F.photo)
-async def p_upload_photo(msg: Message, state: FSMContext):
-    if not has_admin(msg.from_user.id,"owner"):
-        await msg.answer("  ✗ Owner only!"); await state.clear(); return
-    file_id = msg.photo[-1].file_id
-    set_bot_photo(file_id)
-    admin_log(msg.from_user.id,"UPDATE_PHOTO")
-    await state.clear()
-    await msg.answer(
-        f"{B}\n  ✅  𝗣𝗛𝗢𝗧𝗢 𝗨𝗣𝗗𝗔𝗧𝗘𝗗\n{B}\n\n"
-        "  ✔ Bot welcome photo updated!\n"
-        "  ▸ It will show for new users.",
-        reply_markup=K.back_admin()
-    )
-
-
-# ═══════════════════════════════════════════
-#  📢 BROADCAST
-# ═══════════════════════════════════════════
-
-@rt.callback_query(F.data == "a_bcast_menu")
-async def cb_bcast_menu(cb: CallbackQuery):
-    if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
-    await cb.message.edit_text(
-        f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧\n{B}\n\n"
-        f"  👥 All: {len(ALLOWED_USERS)}  💎 VIP: {len(VIP_USERS)}",
-        reply_markup=K.broadcast_menu())
-    await cb.answer()
-
-
-@rt.callback_query(F.data == "bcast_text")
-async def cb_bcast_text(cb: CallbackQuery, state: FSMContext):
-    if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
-    await state.update_data(bcast_target="all")
-    await state.set_state(SAdmin.bcast_text)
-    await cb.message.edit_text(hdr("📢","𝗧𝗘𝗫𝗧 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧")+f"\n\n  Message to all {len(ALLOWED_USERS)} users:", reply_markup=K.back_admin())
-    await cb.answer()
-
-
-@rt.callback_query(F.data == "bcast_vip")
-async def cb_bcast_vip(cb: CallbackQuery, state: FSMContext):
-    if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
-    await state.update_data(bcast_target="vip")
-    await state.set_state(SAdmin.bcast_text)
-    await cb.message.edit_text(hdr("💎","𝗩𝗜𝗣 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧")+f"\n\n  Message to {len(VIP_USERS)} VIPs:", reply_markup=K.back_admin())
-    await cb.answer()
-
-
-@rt.callback_query(F.data == "bcast_photo")
-async def cb_bcast_photo(cb: CallbackQuery, state: FSMContext):
-    if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
-    await state.update_data(bcast_target="all")
-    await state.set_state(SAdmin.bcast_photo)
-    await cb.message.edit_text(hdr("🖼","𝗣𝗛𝗢𝗧𝗢 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧")+"\n\n  Send a photo:", reply_markup=K.back_admin())
-    await cb.answer()
-
-
-@rt.message(SAdmin.bcast_photo, F.photo)
-async def p_bcast_photo_file(msg: Message, state: FSMContext):
-    await state.update_data(bcast_photo_id=msg.photo[-1].file_id)
-    await state.set_state(SAdmin.bcast_photo_cap)
-    await msg.answer("  ✔ Photo received!\n  Type caption:", reply_markup=K.back_admin())
-
-
-@rt.message(SAdmin.bcast_photo, F.text)
-async def p_bcast_photo_url(msg: Message, state: FSMContext):
-    await state.update_data(bcast_photo_id=msg.text.strip())
-    await state.set_state(SAdmin.bcast_photo_cap)
-    await msg.answer("  ✔ URL set!\n  Type caption:", reply_markup=K.back_admin())
-
-
-@rt.message(SAdmin.bcast_photo_cap)
-async def p_bcast_photo_cap(msg: Message, state: FSMContext):
-    d = await state.get_data(); await state.clear()
-    caption = msg.text.strip()
-    photo   = d.get("bcast_photo_id","")
-    target  = d.get("bcast_target","all")
-    targets = VIP_USERS if target=="vip" else ALLOWED_USERS
-    bc_cap  = f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧\n{B}\n\n  {caption}"
-    s=f=0
-    for uid in list(targets):
-        try: await bot.send_photo(uid, photo=photo, caption=bc_cap); s+=1
-        except:
-            try: await bot.send_message(uid, bc_cap); s+=1
-            except: f+=1
-        await asyncio.sleep(0.05)
-    admin_log(msg.from_user.id,f"BCAST_PHOTO s={s} f={f}")
-    add_broadcast_history(msg.from_user.id,"photo",caption,s,f)
-    await msg.answer(f"  📢 Done!\n  ✔ {s} sent  ✗ {f} failed", reply_markup=K.back_admin())
-
-
-@rt.message(SAdmin.bcast_text)
-async def p_bcast_text(msg: Message, state: FSMContext):
-    d = await state.get_data(); await state.clear()
-    txt     = msg.text.strip()
-    target  = d.get("bcast_target","all")
-    targets = VIP_USERS if target=="vip" else ALLOWED_USERS
-    bc = f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧\n{B}\n\n  {txt}"
-    s=f=0
-    for uid in list(targets):
-        try: await bot.send_message(uid, bc); s+=1
-        except: f+=1
-        await asyncio.sleep(0.05)
-    admin_log(msg.from_user.id,f"BCAST_TEXT s={s} f={f}")
-    add_broadcast_history(msg.from_user.id,"text",txt,s,f)
-    await msg.answer(f"  📢 Done!\n  ✔ {s} sent  ✗ {f} failed", reply_markup=K.back_admin())
-
-
-# ── Owner: Add/Remove Admin, Maintenance, Reset ───
 
 @rt.callback_query(F.data == "a_addadm")
 async def cb_a_addadm(cb: CallbackQuery, state: FSMContext):
-    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗ Owner only!",show_alert=True); return
+    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗",show_alert=True); return
     await state.set_state(SAdmin.addadm_id)
-    await cb.message.edit_text(hdr("➕","𝗔𝗗𝗗 𝗔𝗗𝗠𝗜𝗡")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
+    await cb.message.edit_text(hdr("👑","𝗔𝗗𝗗 𝗔𝗗𝗠𝗜𝗡")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -2474,38 +2335,29 @@ async def cb_a_addadm(cb: CallbackQuery, state: FSMContext):
 async def p_addadm_id(msg: Message, state: FSMContext):
     try: uid = int(msg.text.strip())
     except: await msg.answer("  ✗ Invalid ID."); return
-    await state.update_data(target=uid)
+    await state.update_data(adm_uid=uid)
     await state.set_state(SAdmin.addadm_lv)
-    await msg.answer(
-        f"  Select role for <code>{uid}</code>:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="👮 Moderator",  callback_data="sl_moderator")],
-            [InlineKeyboardButton(text="🛡 Admin",      callback_data="sl_admin")],
-            [InlineKeyboardButton(text="⭐ Super Admin", callback_data="sl_superadmin")],
-            [InlineKeyboardButton(text="◂ Cancel",      callback_data="admin_menu")],
-        ]))
+    await msg.answer("  Enter role (superadmin / admin / moderator):", reply_markup=K.back_admin())
 
 
-@rt.callback_query(F.data.startswith("sl_"))
-async def cb_sl(cb: CallbackQuery, state: FSMContext):
-    role = cb.data[3:]
-    d    = await state.get_data(); t = d.get("target")
-    if not t: await cb.answer("✗"); await state.clear(); return
+@rt.message(SAdmin.addadm_lv)
+async def p_addadm_lv(msg: Message, state: FSMContext):
+    role = msg.text.strip().lower()
+    if role not in ADMIN_LEVELS:
+        await msg.answer("  ✗ Invalid role. Choose superadmin, admin, or moderator."); return
+    data = await state.get_data()
+    uid  = data.get("adm_uid")
     await state.clear()
-    store_add_admin(t, role)
-    admin_log(cb.from_user.id,f"ADD_ADMIN_{role}",str(t))
-    try: await cb.message.edit_text(f"  ✔ <code>{t}</code> → {role}", reply_markup=K.back_admin())
-    except: pass
-    try: await bot.send_message(t, f"  🎉 You are now {role}!\n  Use /admin")
-    except: pass
-    await cb.answer()
+    store_add_admin(uid, role)
+    admin_log(msg.from_user.id,"ADD_ADMIN",f"{uid}:{role}")
+    await msg.answer(f"  👑 <code>{uid}</code> is now <b>{role}</b>!", reply_markup=K.back_admin())
 
 
 @rt.callback_query(F.data == "a_rmadm")
 async def cb_a_rmadm(cb: CallbackQuery, state: FSMContext):
-    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗ Owner only!",show_alert=True); return
+    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗",show_alert=True); return
     await state.set_state(SAdmin.rmadm)
-    await cb.message.edit_text(hdr("➖","𝗥𝗘𝗠 𝗔𝗗𝗠𝗜𝗡")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
+    await cb.message.edit_text(hdr("👑","𝗥𝗘𝗠𝗢𝗩𝗘 𝗔𝗗𝗠𝗜𝗡")+"\n\n  Enter user ID:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -2515,100 +2367,90 @@ async def p_rmadm(msg: Message, state: FSMContext):
     except: await msg.answer("  ✗ Invalid ID."); return
     if uid == OWNER_ID: await msg.answer("  ✗ Cannot remove owner!", reply_markup=K.back_admin()); await state.clear(); return
     await state.clear()
-    store_remove_admin(uid); admin_log(msg.from_user.id,"REM_ADMIN",str(uid))
-    await msg.answer(f"  ✔ <code>{uid}</code> demoted!", reply_markup=K.back_admin())
+    store_remove_admin(uid)
+    admin_log(msg.from_user.id,"RM_ADMIN",str(uid))
+    await msg.answer(f"  👑 Admin role removed for <code>{uid}</code>", reply_markup=K.back_admin())
 
 
 @rt.callback_query(F.data == "a_maint")
 async def cb_a_maint(cb: CallbackQuery):
-    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗ Owner only!",show_alert=True); return
-    STORE["maintenance"] = not STORE.get("maintenance",False)
+    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗",show_alert=True); return
+    STORE["maintenance"] = not STORE.get("maintenance", False)
     save_store(STORE)
-    st = "🔴 ON" if STORE["maintenance"] else "🟢 OFF"
-    admin_log(cb.from_user.id,f"MAINTENANCE_{st}")
-    await cb.message.edit_text(f"  🔧 Maintenance: {st}", reply_markup=K.back_admin())
+    status = "ON" if STORE["maintenance"] else "OFF"
+    await cb.message.edit_text(f"  🔧 Maintenance mode is now <b>{status}</b>", reply_markup=K.back_admin())
     await cb.answer()
 
 
 @rt.callback_query(F.data == "a_reset")
 async def cb_a_reset(cb: CallbackQuery):
-    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗ Owner only!",show_alert=True); return
-    STORE["stats"] = {"total_logins":0,"total_actions":0,"total_unlocks":0}
-    STORE["daily_stats"] = {}
-    save_store(STORE); admin_log(cb.from_user.id,"RESET_STATS")
-    await cb.message.edit_text("  ✔ Stats reset!", reply_markup=K.back_admin())
+    if not has_admin(cb.from_user.id,"owner"): await cb.answer("✗",show_alert=True); return
+    STORE["stats"] = {"total_logins": 0, "total_actions": 0, "total_unlocks": 0}
+    save_store(STORE)
+    await cb.message.edit_text("  🔄 Statistics reset successfully!", reply_markup=K.back_admin())
+    await cb.answer()
+
+
+# ── Broadcast ─────────────────────────────
+
+@rt.callback_query(F.data == "a_bcast_menu")
+async def cb_bcast_menu(cb: CallbackQuery):
+    if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
+    await cb.message.edit_text(hdr("📢","𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧")+"\n\n  Select broadcast type:", reply_markup=K.broadcast_menu())
+    await cb.answer()
+
+
+@rt.callback_query(F.data == "bcast_text")
+async def cb_bcast_text(cb: CallbackQuery, state: FSMContext):
+    if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
+    await state.set_state(SAdmin.bcast_text)
+    await cb.message.edit_text(hdr("📢","𝗧𝗘𝗫𝗧 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧")+"\n\n  Send text message to broadcast:", reply_markup=K.back_admin())
+    await cb.answer()
+
+
+@rt.message(SAdmin.bcast_text)
+async def p_bcast_text(msg: Message, state: FSMContext):
+    await state.clear()
+    txt = msg.text
+    sent = 0; failed = 0
+    targets = list(ALLOWED_USERS)
+    ld = await msg.answer(f"  ⏳ Broadcasting to {len(targets)} users...")
+    for uid in targets:
+        try:
+            await bot.send_message(uid, txt)
+            sent += 1
+        except:
+            failed += 1
+        await asyncio.sleep(0.05)
+    add_broadcast_history(msg.from_user.id, "text", txt, sent, failed)
+    await ld.edit_text(f"  📢 Broadcast complete!\n\n  ✔ Sent: {sent}\n  ✗ Failed: {failed}", reply_markup=K.back_admin())
+
+
+@rt.callback_query(F.data == "bcast_vip")
+async def cb_bcast_vip(cb: CallbackQuery, state: FSMContext):
+    if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
+    await state.set_state(SAdmin.bcast_text)
+    await state.update_data(vip_only=True)
+    await cb.message.edit_text(hdr("💎","𝗩𝗜𝗣 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧")+"\n\n  Send text message for VIP users:", reply_markup=K.back_admin())
     await cb.answer()
 
 
 # ═══════════════════════════════════════════
-#  📋 COMMANDS
-# ═══════════════════════════════════════════
-
-@rt.message(Command("help"))
-async def cmd_help(msg: Message):
-    await msg.answer(
-        f"{B}\n  ❓  𝗛𝗘𝗟𝗣\n{B}\n\n"
-        "  /start  — Start bot\n"
-        "  /admin  — Admin panel\n"
-        "  /bulkadd — Bulk add users (admin)\n"
-        "  /help   — Help\n"
-        "  /status — Status\n"
-        "  /ping   — Ping\n\n"
-    )
-
-
-@rt.message(Command("status"))
-async def cmd_status(msg: Message):
-    uid   = msg.from_user.id
-    td    = nuker.get_token_data(uid)
-    up    = time.strftime('%H:%M:%S', time.gmtime(time.time()-START_TIME))
-    maint = "🔴" if is_maintenance() else "🟢"
-    txt   = f"{B}\n  🤖  𝗦𝗧𝗔𝗧𝗨𝗦\n{B}\n\n"
-    txt  += f"  Logged:  {'✔' if td else '✗'}\n"
-    if td: txt += f"  Email:   {td.get('email','—')}\n"
-    txt  += f"  Users:   {len(ALLOWED_USERS)}\n  Maint:   {maint}\n  Uptime:  {up}"
-    await msg.answer(txt)
-
-
-@rt.message(Command("ping"))
-async def cmd_ping(msg: Message):
-    t = time.time()
-    m = await msg.answer("  🏓 ...")
-    await m.edit_text(f"  🏓 Pong! {(time.time()-t)*1000:.0f}ms")
-
-
-# ═══════════════════════════════════════════
-#  🚀 MAIN
+#  🚀 MAIN RUNNER
 # ═══════════════════════════════════════════
 
 async def main():
-    global START_TIME
-    START_TIME = time.time()
-
-    log.info("━"*40)
-    log.info("  🔥 𝗣𝗥𝗜𝗠𝗢𝗖𝗣𝗠𝗧𝗢𝗢𝗟 🔥")
-    log.info(f"  Owner:  {OWNER_ID}")
-    log.info(f"  Users:  {len(ALLOWED_USERS)}")
-    log.info(f"  Brotli: {'✔' if HAS_BROTLI else '✗ pip install brotli'}")
-    log.info(f"  Crypto: {'✔' if HAS_CRYPTO else '✗ pip install pycryptodome'}")
-    log.info("━"*40)
-
+    log.info("Starting bot...")
     await bot.set_my_commands([
-        BotCommand(command="start",  description="🎮 Start"),
-        BotCommand(command="admin",  description="👑 Admin"),
-        BotCommand(command="bulkadd", description="📥 Bulk add users"),
-        BotCommand(command="help",   description="❓ Help"),
-        BotCommand(command="status", description="📊 Status"),
-        BotCommand(command="ping",   description="🏓 Ping"),
+        BotCommand(command="start", description="Start the bot"),
+        BotCommand(command="admin", description="Admin Panel"),
+        BotCommand(command="bulkadd", description="Bulk Add Users"),
     ])
-
-    await dp.start_polling(bot, skip_updates=True)
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
-        log.info("Stopped.")
-    except Exception as e:
-        log.error(f"Fatal: {e}\n{traceback.format_exc()}")
+    except (KeyboardInterrupt, SystemExit):
+        log.info("Bot stopped!")
