@@ -1,4 +1,4 @@
 aiogram
 aiohttp
+pycryptodome
 flask
-pydantic
