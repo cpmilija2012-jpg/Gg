@@ -1031,7 +1031,7 @@ class T:
     def welcome(name, username, uid):
         now = datetime.now()
         return (
-            f"{B}\n🔥 𝗣𝗥𝗜𝗠𝗢𝗖𝗣𝗠𝗧𝗢𝗢𝗟 🔥\n{B}\n\n"
+            f"{B}\n🔥 𝗖𝗣𝗠  𝗧𝗢𝗢𝗟 🔥\n{B}\n\n"
             f"  ╭──── 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 ────╮\n"
             f"  │ 👤 {name}\n"
             f"  │ 📱 @{username or 'N/A'}\n"
