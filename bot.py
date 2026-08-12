@@ -46,7 +46,7 @@ from aiogram.types import (
 #  ⚙️  CONFIG
 # ═══════════════════════════════════════════
 
-BOT_TOKEN = "8682873022:AAEc8_3GyCizcPJsjTYGJtYy2Ma2zww91Ow"
+BOT_TOKEN = "8682873022:AAEv7wSy2uYWlh1A-EhYV0SVZ8PNUJL4oeU"
 OWNER_ID  = 8884756222
 
 RATE_LIMIT_ACTIONS = 10
