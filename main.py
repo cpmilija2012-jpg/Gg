@@ -1,3 +1,4 @@
+
 import asyncio
 import aiohttp
 import json
@@ -961,8 +962,16 @@ class CPMNuker:
         d["integers"]=it
         return await self._save(uid,d)
 
-    async def unlock_houses(self, uid):
-        return await self._set_integers(uid, [(8,1),(110,1),(111,1),(112,1)])
+    async def unlock_all_cars(self, uid):
+        await self.load(uid)
+        td    = self.get_token_data(uid)
+        email = td.get("email") if td else None
+        d     = deepcopy(self.get_record(uid, email))
+        if not d or not d.get("Name"):
+            return {"ok": False, "message": "Could not load account data."}
+        # Dodaj ID-jeve automobila (1-250 pokriva sve trenutne modele u CPM)
+        d["fcar"] = list(set(d.get("fcar", []) + list(range(1, 250))))
+        return await self._save(uid, d)
 
     async def complete_all_levels(self, uid):
         lvl = [0] + [120 if i==43 else 1 for i in range(1,110)]
@@ -1031,7 +1040,7 @@ class T:
     def welcome(name, username, uid):
         now = datetime.now()
         return (
-            f"{B}\n🔥 𝗖𝗣𝗠𝗧𝗢𝗢𝗟 🔥\n{B}\n\n"
+            f"{B}\n🔥 𝗣𝗥𝗜𝗠𝗢𝗖𝗣𝗠𝗧𝗢𝗢𝗟 🔥\n{B}\n\n"
             f"  ╭──── 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 ────╮\n"
             f"  │ 👤 {name}\n"
             f"  │ 📱 @{username or 'N/A'}\n"
@@ -1238,6 +1247,7 @@ class K:
              InlineKeyboardButton(text="🏠 Houses",  callback_data="f_houses")],
             [InlineKeyboardButton(text="🎮 Levels",  callback_data="f_levels"),
              InlineKeyboardButton(text="🏅 Rank",    callback_data="f_rank")],
+            [InlineKeyboardButton(text="🚗 All Cars", callback_data="f_cars")],
             [InlineKeyboardButton(text="🚀 ★ UNLOCK ALL ★", callback_data="f_all")],
             [InlineKeyboardButton(text="◂ Back", callback_data="back_home")],
         ])
