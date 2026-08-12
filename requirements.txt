@@ -1,7 +1,3 @@
-aiogram==3.13.0
-aiohttp==3.10.5
-pycryptodome
-brotli
-gunicorn==23.0.0
-python-telegram-bot
+python-telegram-bot>=20.0
 flask
+pydantic
