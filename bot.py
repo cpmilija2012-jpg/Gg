@@ -1,3 +1,9 @@
+import os
+from threading import Thread
+from flask import Flask
+
+app = Flask('')
+
 import asyncio
 import aiohttp
 import json
@@ -60,6 +66,17 @@ RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4
 
 MAX_MONEY = 50_000_000
 MAX_COIN  = 500_000
+@app.route('/')
+def main():
+    return "Bot is alive!"
+
+def run():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    server = Thread(target=run)
+    server.start()
 
 # ═══════════════════════════════════════════
 #  📊 LOGGING
@@ -2594,6 +2611,8 @@ async def main():
     ])
 
     await dp.start_polling(bot, skip_updates=True)
+# Start web server in background
+keep_alive()
 
 
 if __name__ == "__main__":
