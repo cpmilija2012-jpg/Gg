@@ -1,9 +1,3 @@
-import os
-from threading import Thread
-from flask import Flask
-
-app = Flask('')
-
 import asyncio
 import aiohttp
 import json
@@ -52,7 +46,7 @@ from aiogram.types import (
 #  ⚙️  CONFIG
 # ═══════════════════════════════════════════
 
-BOT_TOKEN = "8682873022:AAEv7wSy2uYWlh1A-EhYV0SVZ8PNUJL4oeU"
+BOT_TOKEN = "8682873022:AAEc8_3GyCizcPJsjTYGJtYy2Ma2zww91Ow"
 OWNER_ID  = 8884756222
 
 RATE_LIMIT_ACTIONS = 10
@@ -62,21 +56,10 @@ BULKADD_TIMEOUT_SECONDS = 180
 FK       = "AIzaSyAe_aOVT1gSfmHKBrorFvX4fRwN5nODXVA"
 LOAD_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/GetPlayerRecords3"
 SAVE_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/SavePlayerRecordsPartially8"
-RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
+RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating1"
 
 MAX_MONEY = 50_000_000
 MAX_COIN  = 500_000
-@app.route('/')
-def main():
-    return "Bot is alive!"
-
-def run():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-def keep_alive():
-    server = Thread(target=run)
-    server.start()
 
 # ═══════════════════════════════════════════
 #  📊 LOGGING
@@ -1048,15 +1031,14 @@ class T:
     def welcome(name, username, uid):
         now = datetime.now()
         return (
-            f"{B}\n"
-            f"  CAR PARKING MULTIPLAYER\n"
-            f"  KING RANK SERVICE\n"
-            f"{B}\n\n"
-            f"  📸 Instagram: ilija.jvcc\n"
-            f"  📱 Telegram: @ILIJASELL\n\n"
-            f"  📋 Status: Active. Expires in 999 days\n"
-            f"  ({now.strftime('%Y-%m-%d %H:%M:%S')}).\n\n"
-            f"  Use /start to open menu."
+            f"{B}\n🔥 𝗣𝗥𝗜𝗠𝗢𝗖𝗣𝗠𝗧𝗢𝗢𝗟 🔥\n{B}\n\n"
+            f"  ╭──── 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 ────╮\n"
+            f"  │ 👤 {name}\n"
+            f"  │ 📱 @{username or 'N/A'}\n"
+            f"  │ 🆔 <code>{uid}</code>\n"
+            f"  │ 📅 {now.strftime('%d %b %Y • %I:%M %p')}\n"
+            f"  ╰─────────────────╯\n\n"
+            f"  ▸ Sign in with your CPM credentials"
         )
 
     @staticmethod
@@ -2611,8 +2593,6 @@ async def main():
     ])
 
     await dp.start_polling(bot, skip_updates=True)
-# Start web server in background
-keep_alive()
 
 
 if __name__ == "__main__":
