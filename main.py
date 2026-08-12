@@ -56,7 +56,7 @@ BULKADD_TIMEOUT_SECONDS = 180
 FK       = "AIzaSyAe_aOVT1gSfmHKBrorFvX4fRwN5nODXVA"
 LOAD_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/GetPlayerRecords3"
 SAVE_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/SavePlayerRecordsPartially8"
-RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
+RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating1"
 
 MAX_MONEY = 50_000_000
 MAX_COIN  = 500_000
