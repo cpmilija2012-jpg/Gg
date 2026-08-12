@@ -1,3 +1,20 @@
+import os
+from threading import Thread
+from flask import Flask
+
+app = Flask('')
+
+@app.route('/')
+def main():
+    return "Bot is alive!"
+
+def run():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+server = Thread(target=run)
+server.start()
+
 import asyncio
 import aiohttp
 import json
