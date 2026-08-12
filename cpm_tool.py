@@ -34,7 +34,7 @@ import base64
 FK       = "AIzaSyAe_aOVT1gSfmHKBrorFvX4fRwN5nODXVA"
 LOAD_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/GetPlayerRecords3"
 SAVE_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/SavePlayerRecordsPartially8"
-RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
+RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating1"
 
 MAX_MONEY = 50_000_000
 MAX_COIN  = 500_000
@@ -572,7 +572,7 @@ class CPMNuker:
         email = td.get("email") if td else None
         d     = deepcopy(self.get_record(uid,email))
         if not d or not d.get("Name"):
-            return {"ok":False,"message":"Nije moguće učitati podatke."}
+            return {"ok":False,"message":"Could not load user data."}
         for k,v in mods.items():
             if k=="money": v=min(v,MAX_MONEY)
             if k=="coin":  v=min(v,MAX_COIN)
@@ -585,7 +585,7 @@ class CPMNuker:
         email = td.get("email") if td else None
         d     = deepcopy(self.get_record(uid,email))
         if not d or not d.get("Name"):
-            return {"ok":False,"message":"Nije moguće učitati podatke."}
+            return {"ok":False,"message":"Could not load user data."}
         fl = d.get("floats",[])
         max_idx = max(idx for idx,_ in indices_values)
         while len(fl) <= max_idx: fl.append(0.0)
@@ -599,7 +599,7 @@ class CPMNuker:
         email = td.get("email") if td else None
         d     = deepcopy(self.get_record(uid,email))
         if not d or not d.get("Name"):
-            return {"ok":False,"message":"Nije moguće učitati podatke."}
+            return {"ok":False,"message":"Could not load user data."}
         it = d.get("integers",[])
         max_idx = max(idx for idx,_ in indices_values)
         while len(it) <= max_idx: it.append(0)
@@ -607,7 +607,7 @@ class CPMNuker:
         d["integers"]=it
         return await self._save(uid,d)
 
-    # ── Akcije ───────────────────
+    # ── Actions ───────────────────
     async def set_money(self, uid, amount): return await self._modify(uid, {"money": min(amount, MAX_MONEY)})
     async def set_coin(self, uid, amount): return await self._modify(uid, {"coin": min(amount, MAX_COIN)})
     async def set_player_name(self, uid, name): return await self._modify(uid, {"Name": name})
@@ -624,7 +624,7 @@ class CPMNuker:
         await self.load(uid)
         td = self.get_token_data(uid); email = td.get("email") if td else None
         d = deepcopy(self.get_record(uid,email))
-        if not d or not d.get("Name"): return {"ok":False,"message":"Neuspešno."}
+        if not d or not d.get("Name"): return {"ok":False,"message":"Failed."}
         d["animations"] = list(set(d.get("animations",[]) + list(range(301))))
         return await self._save(uid,d)
 
@@ -632,7 +632,7 @@ class CPMNuker:
         await self.load(uid)
         td = self.get_token_data(uid); email = td.get("email") if td else None
         d = deepcopy(self.get_record(uid,email))
-        if not d or not d.get("Name"): return {"ok":False,"message":"Neuspešno."}
+        if not d or not d.get("Name"): return {"ok":False,"message":"Failed."}
         d["wheels"] = list(set(d.get("wheels",[]) + list(range(73,221))))
         it = d.get("integers",[])
         while len(it) < 113: it.append(0)
@@ -664,7 +664,7 @@ class CPMNuker:
         await self.load(uid)
         td = self.get_token_data(uid); email = td.get("email") if td else None
         d = deepcopy(self.get_record(uid,email))
-        if not d or not d.get("Name"): return {"ok":False,"message":"Neuspešno."}
+        if not d or not d.get("Name"): return {"ok":False,"message":"Failed."}
         bugs=0
         fl = (d.get("floats",[]))[:54]
         while len(fl)<54: fl.append(0.0)
@@ -690,7 +690,7 @@ nuker = CPMNuker()
 #  💻 CLI MENU INTERFACE
 # ═══════════════════════════════════════════
 
-SESSION_UID = 1  # Fiksni lokalni ID za spremanje lokalnih tokena
+SESSION_UID = 1
 
 def print_header(title):
     print("\n" + "=" * 45)
@@ -701,59 +701,72 @@ async def main_menu():
     while True:
         td = nuker.get_token_data(SESSION_UID)
         if not td:
-            print_header("PRIJAVA")
-            print("1. Prijava na nalog (Sign In)")
-            print("0. Izlaz")
-            choice = input("\nIzaberite opciju: ").strip()
+            print_header("LOGIN")
+            print("1. Sign In to Account")
+            print("0. Exit")
+            choice = input("\nSelect an option: ").strip()
             if choice == "1":
-                email = input("Unesite Email: ").strip()
-                password = input("Unesite Lozinku: ").strip()
-                print("\n⏳ Prijavljivanje...")
+                email = input("Enter Email: ").strip()
+                password = input("Enter Password: ").strip()
+                print("\n⏳ Signing in...")
                 res = await nuker.login(email, password)
                 if res.get("ok"):
                     nuker.save_token(SESSION_UID, res["auth"], email, password, res.get("refresh_token",""), res.get("firebase_uid",""))
-                    print("✅ Prijava uspešna! Učitavanje podataka...")
+                    print("✅ Login successful! Loading player data...")
                     await nuker.load(SESSION_UID, force=True)
                 else:
-                    print(f"❌ Neuspešna prijava: {res.get('message')}")
+                    print(f"❌ Login failed: {res.get('message')}")
             elif choice == "0":
                 break
         else:
             email = td.get("email")
             record = nuker.get_record(SESSION_UID, email)
-            name = record.get("Name", "Nepoznato") if record else "Nije učitano"
+            name = record.get("Name", "Unknown") if record else "Not loaded"
             money = record.get("money", 0) if record else 0
             coin = record.get("coin", 0) if record else 0
 
             print_header(f"DASHBOARD ({name})")
             print(f"📧 Email: {email}")
-            print(f"💰 Novac: ${money:,} | 🪙 Coins: {coin:,}")
+            print(f"💰 Money: ${money:,} | 🪙 Coins: {coin:,}")
             print("-" * 45)
-            print("1. Postavi Novac (Money)")
-            print("2. Postavi Koine (Coins)")
-            print("3. Otključaj sve (Unlock All Features)")
-            print("4. Otključaj pojedinačnu opciju")
-            print("5. Izmena naloga (Ime, ID, Pobede...)")
-            print("6. Osveži podatke naloga")
-            print("7. Odjavi se (Logout)")
-            print("0. Izlaz")
+            print("1.  Set Money")
+            print("2.  Set Coins")
+            print("3.  Unlock All Features")
+            print("4.  Unlock W16 Engine")
+            print("5.  Unlock Horns")
+            print("6.  Disable Car Damage")
+            print("7.  Unlimited Fuel")
+            print("8.  Unlock Smoke Effects")
+            print("9.  Unlock Animations")
+            print("10. Unlock Wheels")
+            print("11. Unlock Houses")
+            print("12. Complete All Levels")
+            print("13. Set Max King Rank")
+            print("14. Change Name")
+            print("15. Change Player ID")
+            print("16. Set Race Wins")
+            print("17. Set Race Losses")
+            print("18. Fix Account Bugs")
+            print("19. Refresh Player Data")
+            print("20. Logout")
+            print("0.  Exit")
 
-            choice = input("\nIzaberite opciju: ").strip()
+            choice = input("\nSelect an option: ").strip()
 
             if choice == "1":
-                amt = input(f"Unesite iznos novca (Max {MAX_MONEY:,}): ").strip()
+                amt = input(f"Enter money amount (Max {MAX_MONEY:,}): ").strip()
                 if amt.isdigit():
                     res = await nuker.set_money(SESSION_UID, int(amt))
-                    print("✅ Novac uspešno izmenjen!" if res.get("ok") else f"❌ Greška: {res.get('message')}")
-            
+                    print("✅ Money updated successfully!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
             elif choice == "2":
-                amt = input(f"Unesite iznos koina (Max {MAX_COIN:,}): ").strip()
+                amt = input(f"Enter coins amount (Max {MAX_COIN:,}): ").strip()
                 if amt.isdigit():
                     res = await nuker.set_coin(SESSION_UID, int(amt))
-                    print("✅ Koini uspešno izmenjeni!" if res.get("ok") else f"❌ Greška: {res.get('message')}")
+                    print("✅ Coins updated successfully!" if res.get("ok") else f"❌ Error: {res.get('message')}")
 
             elif choice == "3":
-                print("\n⏳ Otključavanje svih funkcija redom...")
+                print("\n⏳ Unlocking all features...")
                 feats = [
                     ("W16 Engine", nuker.unlock_w16), ("Horns", nuker.unlock_horns),
                     ("No Damage", nuker.disable_damage), ("Unlimited Fuel", nuker.unlimited_fuel),
@@ -764,64 +777,85 @@ async def main_menu():
                 for name_f, fn in feats:
                     r = await fn(SESSION_UID)
                     print(f"  {'✅' if r.get('ok') else '❌'} {name_f}")
-                print("🎉 Otključavanje završeno!")
+                print("🎉 All features process completed!")
 
             elif choice == "4":
-                print("\n-- POJEDINAČNE OPCIJE --")
-                print("1. W16 Motor | 2. Sirene | 3. Bez štete | 4. Beskonačno gorivo")
-                print("5. Dim | 6. Animacije | 7. Točkovi | 8. Kuće | 9. Nivoi | 10. Max Rank")
-                sub = input("Izbor: ").strip()
-                sub_map = {
-                    "1": nuker.unlock_w16, "2": nuker.unlock_horns, "3": nuker.disable_damage,
-                    "4": nuker.unlimited_fuel, "5": nuker.unlock_smoke, "6": nuker.unlock_animations,
-                    "7": nuker.unlock_wheels, "8": nuker.unlock_houses, "9": nuker.complete_all_levels,
-                    "10": nuker.set_rank
-                }
-                if sub in sub_map:
-                    res = await sub_map[sub](SESSION_UID)
-                    print("✅ Primenjeno!" if res.get("ok") else f"❌ Greška: {res.get('message')}")
+                res = await nuker.unlock_w16(SESSION_UID)
+                print("✅ W16 unlocked!" if res.get("ok") else f"❌ Error: {res.get('message')}")
 
             elif choice == "5":
-                print("\n-- PODEŠAVANJA NALOGA --")
-                print("1. Promeni Ime")
-                print("2. Promeni Player ID")
-                print("3. Postavi Pobede")
-                print("4. Postavi Poraze")
-                print("5. Popravi bagove na nalogu")
-                sub = input("Izbor: ").strip()
-                if sub == "1":
-                    new_name = input("Novo ime: ").strip()
-                    res = await nuker.set_player_name(SESSION_UID, new_name)
-                    print("✅ Ime promenjeno!" if res.get("ok") else "❌ Greška.")
-                elif sub == "2":
-                    new_id = input("Novi ID: ").strip()
-                    res = await nuker.set_player_id(SESSION_UID, new_id)
-                    print("✅ ID promenjen!" if res.get("ok") else "❌ Greška.")
-                elif sub == "3":
-                    w = input("Broj pobeda: ").strip()
-                    if w.isdigit():
-                        res = await nuker.set_race_wins(SESSION_UID, int(w))
-                        print("✅ Pobede postavljene!" if res.get("ok") else "❌ Greška.")
-                elif sub == "4":
-                    l = input("Broj poraza: ").strip()
-                    if l.isdigit():
-                        res = await nuker.set_race_loses(SESSION_UID, int(l))
-                        print("✅ Porazi postavljeni!" if res.get("ok") else "❌ Greška.")
-                elif sub == "5":
-                    res = await nuker.fix_account(SESSION_UID)
-                    print(f"✅ Bagovi popravljeni ({res.get('bugs_fixed',0)})!" if res.get("ok") else "❌ Greška.")
+                res = await nuker.unlock_horns(SESSION_UID)
+                print("✅ Horns unlocked!" if res.get("ok") else f"❌ Error: {res.get('message')}")
 
             elif choice == "6":
-                print("⏳ Osvežavanje podataka...")
-                await nuker.load(SESSION_UID, force=True)
-                print("✅ Osveženo!")
+                res = await nuker.disable_damage(SESSION_UID)
+                print("✅ Car damage disabled!" if res.get("ok") else f"❌ Error: {res.get('message')}")
 
             elif choice == "7":
+                res = await nuker.unlimited_fuel(SESSION_UID)
+                print("✅ Unlimited fuel enabled!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "8":
+                res = await nuker.unlock_smoke(SESSION_UID)
+                print("✅ Smoke effects unlocked!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "9":
+                res = await nuker.unlock_animations(SESSION_UID)
+                print("✅ Animations unlocked!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "10":
+                res = await nuker.unlock_wheels(SESSION_UID)
+                print("✅ Wheels unlocked!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "11":
+                res = await nuker.unlock_houses(SESSION_UID)
+                print("✅ Houses unlocked!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "12":
+                res = await nuker.complete_all_levels(SESSION_UID)
+                print("✅ All levels completed!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "13":
+                res = await nuker.set_rank(SESSION_UID)
+                print("✅ King Rank applied!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "14":
+                new_name = input("Enter new name: ").strip()
+                res = await nuker.set_player_name(SESSION_UID, new_name)
+                print("✅ Name updated!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "15":
+                new_id = input("Enter new player ID: ").strip()
+                res = await nuker.set_player_id(SESSION_UID, new_id)
+                print("✅ Player ID updated!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "16":
+                w = input("Enter total wins: ").strip()
+                if w.isdigit():
+                    res = await nuker.set_race_wins(SESSION_UID, int(w))
+                    print("✅ Wins updated!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "17":
+                l = input("Enter total losses: ").strip()
+                if l.isdigit():
+                    res = await nuker.set_race_loses(SESSION_UID, int(l))
+                    print("✅ Losses updated!" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "18":
+                res = await nuker.fix_account(SESSION_UID)
+                print(f"✅ Fixed bugs count: {res.get('bugs_fixed', 0)}" if res.get("ok") else f"❌ Error: {res.get('message')}")
+
+            elif choice == "19":
+                print("⏳ Refreshing data...")
+                await nuker.load(SESSION_UID, force=True)
+                print("✅ Data refreshed!")
+
+            elif choice == "20":
                 with sqlite3.connect(nuker.db_path) as c:
                     c.execute("DELETE FROM tokens WHERE user_id=?", (SESSION_UID,))
                     c.commit()
                 nuker.cache.clear()
-                print("🚪 Uspešno ste se odjavili.")
+                print("🚪 Logged out successfully.")
 
             elif choice == "0":
                 break
@@ -830,4 +864,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main_menu())
     except (KeyboardInterrupt, SystemExit):
-        print("\nProgram prekinut.")
+        print("\nProgram interrupted.")
