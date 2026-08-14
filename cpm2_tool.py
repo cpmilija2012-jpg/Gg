@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -391,31 +392,71 @@ class CPM2Client:
         r = await self._post(EP["get_player_records"], {"data": None})
         if not r:
             return {"ok": False, "message": "No response", "raw": None}
-        # Debug: save raw response
         self._last_raw_response = r
-        if "result" not in r:
-            return {"ok": False, "message": f"No 'result' in response. Keys: {list(r.keys())}", "raw": str(r)[:1000]}
-        self.raw_record_b64 = r["result"]
-        if r["result"] is None:
-            return {"ok": False, "message": "result is None", "raw": str(r)[:1000]}
-        dec = decrypt_player_record(r["result"], self.firebase_uid or "", self.password, self.email)
+
+        # CPM2 format: {"code": 1, "data": "base64..."}  (NOT {"result": "..."})
+        # Extract the base64 payload
+        b64_payload = None
+        if "data" in r and isinstance(r["data"], str) and len(r["data"]) > 50:
+            b64_payload = r["data"]
+        elif "result" in r:
+            if isinstance(r["result"], str) and len(r["result"]) > 50:
+                b64_payload = r["result"]
+            elif isinstance(r["result"], dict) and "data" in r["result"]:
+                b64_payload = r["result"]["data"]
+
+        if not b64_payload:
+            return {"ok": False, "message": f"No valid payload. Keys: {list(r.keys())}", "raw": str(r)[:1000]}
+
+        self.raw_record_b64 = b64_payload
+
+        # Try CPM1 decryption first
+        dec = decrypt_player_record(b64_payload, self.firebase_uid or "", self.password, self.email)
         if dec.get("success"):
             self.record = dec["record"]
             return {"ok": True, "record": self.record}
-        return {"ok": False, "message": dec.get("message", "Decrypt failed"), "raw": str(r["result"])[:500]}
+
+        # CPM2 may use different encryption — try direct base64 decode
+        try:
+            raw = base64.b64decode(b64_payload)
+            # Try to detect format
+            print(f"[DEBUG] Raw length: {len(raw)}")
+            print(f"[DEBUG] First bytes: {raw[:20].hex()}")
+            print(f"[DEBUG] First byte: {raw[0] if raw else 'empty'}")
+        except Exception as e:
+            return {"ok": False, "message": f"Base64 decode failed: {e}", "raw": b64_payload[:200]}
+
+        return {"ok": False, "message": f"CPM2 decrypt not yet implemented. Raw saved.", "raw": b64_payload[:200]}
 
     # ── Car / Garage Server Ops ─────────────
     async def get_all_cars(self) -> Dict:
         r = await self._post(EP["get_all_cars"], {"data": None})
-        if r:
-            self.all_cars = r.get("result", []) if isinstance(r.get("result"), list) else []
-        return r or {}
+        self._last_raw_response = r
+        if not r:
+            return {}
+        # CPM2 may return {"code": 1, "data": [...]} or {"result": [...]}
+        cars = None
+        if "data" in r and isinstance(r["data"], list):
+            cars = r["data"]
+        elif "result" in r:
+            if isinstance(r["result"], list):
+                cars = r["result"]
+            elif isinstance(r["result"], dict) and "data" in r["result"]:
+                cars = r["result"]["data"]
+        if cars is not None:
+            self.all_cars = cars
+            return {"code": 1, "data": cars}
+        return r
 
     async def check_garage(self) -> Dict:
         r = await self._post(EP["check_garage"], {"data": None})
-        if r:
-            self.garage_info = r.get("result", {}) if isinstance(r.get("result"), dict) else {}
-        return r or {}
+        self._last_raw_response = r
+        if not r:
+            return {}
+        # Handle both {"result": {...}} and {"code": 1, "data": ...}
+        info = r.get("result") if isinstance(r.get("result"), dict) else r
+        self.garage_info = info if isinstance(info, dict) else {}
+        return r
 
     async def buy_car(self, car_id: int) -> Dict:
         return await self._post(EP["buy_car"], {"data": car_id})
@@ -535,7 +576,6 @@ async def interactive():
         print(f"[+] Animations: {len(rec.get('animations', []))}")
         print(f"[+] Friends: {len(rec.get('FriendsID', []))}")
 
-        # Dump full record to file for analysis
         dump_file = f"cpm2_record_{client.firebase_uid}.json"
         with open(dump_file, "w", encoding="utf-8") as f:
             json.dump(rec, f, indent=2, ensure_ascii=False)
@@ -546,8 +586,9 @@ async def interactive():
         raw = ld.get('raw')
         if raw:
             print(f"[!] Raw preview: {raw[:500]}")
-        print("    CPM2 may use a different encryption/format than CPM1.")
-        print("    Try option [21] to dump raw response.")
+        print("    CPM2 uses different encryption than CPM1.")
+        print("    The raw base64 has been saved. Check debug output above.")
+        print("    Try option [21] to dump last server response to JSON.")
 
     # ── STEP 2: CHECK GARAGE ────────────────
     print("\n" + "="*50)
@@ -679,12 +720,9 @@ async def interactive():
                 with open("cpm2_last_response.json", "w", encoding="utf-8") as f:
                     json.dump(client._last_raw_response, f, indent=2, ensure_ascii=False)
                 print("[+] Saved last server response to cpm2_last_response.json")
-            elif client.raw_record_b64:
-                with open("cpm2_raw_record.b64", "w") as f:
-                    f.write(client.raw_record_b64)
-                print("[+] Saved to cpm2_raw_record.b64")
+                print(f"    Keys: {list(client._last_raw_response.keys())}")
             else:
-                print("[!] No raw response yet. Run option 1 first.")
+                print("[!] No raw response yet. Run option 1 or 2 first.")
         else:
             print("[!] Invalid choice")
 
