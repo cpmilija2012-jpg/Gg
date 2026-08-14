@@ -1,3 +1,4 @@
+
 import asyncio
 import aiohttp
 import json
@@ -46,8 +47,8 @@ from aiogram.types import (
 #  ⚙️  CONFIG
 # ═══════════════════════════════════════════
 
-BOT_TOKEN = "8951462015:AAHDQX147lh4Y3a-af5tWR-1W5oPhXiaXTc"
-OWNER_ID  = "8884756222"
+BOT_TOKEN = "8682873022:AAEv7wSy2uYWlh1A-EhYV0SVZ8PNUJL4oeU"
+OWNER_ID  = 8884756222
 
 RATE_LIMIT_ACTIONS = 10
 RATE_LIMIT_SECONDS = 60
@@ -56,7 +57,7 @@ BULKADD_TIMEOUT_SECONDS = 180
 FK       = "AIzaSyAe_aOVT1gSfmHKBrorFvX4fRwN5nODXVA"
 LOAD_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/GetPlayerRecords3"
 SAVE_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/SavePlayerRecordsPartially8"
-RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating1"
+RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
 
 MAX_MONEY = 50_000_000
 MAX_COIN  = 500_000
@@ -248,7 +249,7 @@ def store_add_vip(uid):
     if uid in VIP_USERS: return False
     VIP_USERS.append(uid); store_allow(uid)
     STORE["vip_users"] = list(VIP_USERS)
-    save_store(STORE); return 
+    save_store(STORE); return True
 
 def store_remove_vip(uid):
     global VIP_USERS, STORE
@@ -961,16 +962,8 @@ class CPMNuker:
         d["integers"]=it
         return await self._save(uid,d)
 
-    async def unlock_all_cars(self, uid):
-        await self.load(uid)
-        td    = self.get_token_data(uid)
-        email = td.get("email") if td else None
-        d     = deepcopy(self.get_record(uid, email))
-        if not d or not d.get("Name"):
-            return {"ok": False, "message": "Could not load account data."}
-        # Dodaj ID-jeve automobila (1-250 pokriva sve trenutne modele u CPM)
-        d["fcar"] = list(set(d.get("fcar", []) + list(range(1, 250))))
-        return await self._save(uid, d)
+    async def unlock_houses(self, uid):
+        return await self._set_integers(uid, [(8,1),(110,1),(111,1),(112,1)])
 
     async def complete_all_levels(self, uid):
         lvl = [0] + [120 if i==43 else 1 for i in range(1,110)]
@@ -1246,7 +1239,6 @@ class K:
              InlineKeyboardButton(text="🏠 Houses",  callback_data="f_houses")],
             [InlineKeyboardButton(text="🎮 Levels",  callback_data="f_levels"),
              InlineKeyboardButton(text="🏅 Rank",    callback_data="f_rank")],
-            [InlineKeyboardButton(text="🚗 All Cars", callback_data="f_cars")],
             [InlineKeyboardButton(text="🚀 ★ UNLOCK ALL ★", callback_data="f_all")],
             [InlineKeyboardButton(text="◂ Back", callback_data="back_home")],
         ])
