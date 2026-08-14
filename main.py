@@ -1,20 +1,3 @@
-import os
-from threading import Thread
-from flask import Flask
-
-app = Flask('')
-
-@app.route('/')
-def main():
-    return "Bot is alive!"
-
-def run():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-server = Thread(target=run)
-server.start()
-
 import asyncio
 import aiohttp
 import json
@@ -63,8 +46,8 @@ from aiogram.types import (
 #  ⚙️  CONFIG
 # ═══════════════════════════════════════════
 
-BOT_TOKEN = "8682873022:AAEc8_3GyCizcPJsjTYGJtYy2Ma2zww91Ow"
-OWNER_ID  = 8884756222
+BOT_TOKEN = "8951462015:AAHDQX147lh4Y3a-af5tWR-1W5oPhXiaXTc"
+OWNER_ID  = "8884756222"
 
 RATE_LIMIT_ACTIONS = 10
 RATE_LIMIT_SECONDS = 60
@@ -73,7 +56,7 @@ BULKADD_TIMEOUT_SECONDS = 180
 FK       = "AIzaSyAe_aOVT1gSfmHKBrorFvX4fRwN5nODXVA"
 LOAD_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/GetPlayerRecords3"
 SAVE_URL = "https://europe-west1-cp-multiplayer.cloudfunctions.net/SavePlayerRecordsPartially8"
-RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating4"
+RANK_URL = "https://us-central1-cp-multiplayer.cloudfunctions.net/SetUserRating1"
 
 MAX_MONEY = 50_000_000
 MAX_COIN  = 500_000
@@ -265,7 +248,7 @@ def store_add_vip(uid):
     if uid in VIP_USERS: return False
     VIP_USERS.append(uid); store_allow(uid)
     STORE["vip_users"] = list(VIP_USERS)
-    save_store(STORE); return True
+    save_store(STORE); return 
 
 def store_remove_vip(uid):
     global VIP_USERS, STORE
@@ -978,8 +961,16 @@ class CPMNuker:
         d["integers"]=it
         return await self._save(uid,d)
 
-    async def unlock_houses(self, uid):
-        return await self._set_integers(uid, [(8,1),(110,1),(111,1),(112,1)])
+    async def unlock_all_cars(self, uid):
+        await self.load(uid)
+        td    = self.get_token_data(uid)
+        email = td.get("email") if td else None
+        d     = deepcopy(self.get_record(uid, email))
+        if not d or not d.get("Name"):
+            return {"ok": False, "message": "Could not load account data."}
+        # Dodaj ID-jeve automobila (1-250 pokriva sve trenutne modele u CPM)
+        d["fcar"] = list(set(d.get("fcar", []) + list(range(1, 250))))
+        return await self._save(uid, d)
 
     async def complete_all_levels(self, uid):
         lvl = [0] + [120 if i==43 else 1 for i in range(1,110)]
@@ -1048,15 +1039,14 @@ class T:
     def welcome(name, username, uid):
         now = datetime.now()
         return (
-            f"{B}\n"
-            f"  CAR PARKING MULTIPLAYER\n"
-            f"  KING RANK SERVICE\n"
-            f"{B}\n\n"
-            f"  📸 Instagram: ilija.jvcc\n"
-            f"  📱 Telegram: @ILIJASELL\n\n"
-            f"  📋 Status: Active. Expires in 999 days\n"
-            f"  ({now.strftime('%Y-%m-%d %H:%M:%S')}).\n\n"
-            f"  Use /start to open menu."
+            f"{B}\n🔥 𝗣𝗥𝗜𝗠𝗢𝗖𝗣𝗠𝗧𝗢𝗢𝗟 🔥\n{B}\n\n"
+            f"  ╭──── 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 ────╮\n"
+            f"  │ 👤 {name}\n"
+            f"  │ 📱 @{username or 'N/A'}\n"
+            f"  │ 🆔 <code>{uid}</code>\n"
+            f"  │ 📅 {now.strftime('%d %b %Y • %I:%M %p')}\n"
+            f"  ╰─────────────────╯\n\n"
+            f"  ▸ Sign in with your CPM credentials"
         )
 
     @staticmethod
@@ -1256,6 +1246,7 @@ class K:
              InlineKeyboardButton(text="🏠 Houses",  callback_data="f_houses")],
             [InlineKeyboardButton(text="🎮 Levels",  callback_data="f_levels"),
              InlineKeyboardButton(text="🏅 Rank",    callback_data="f_rank")],
+            [InlineKeyboardButton(text="🚗 All Cars", callback_data="f_cars")],
             [InlineKeyboardButton(text="🚀 ★ UNLOCK ALL ★", callback_data="f_all")],
             [InlineKeyboardButton(text="◂ Back", callback_data="back_home")],
         ])
