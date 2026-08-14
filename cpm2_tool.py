@@ -389,14 +389,20 @@ class CPM2Client:
     # ── Player Data ─────────────────────────
     async def load_player(self) -> Dict:
         r = await self._post(EP["get_player_records"], {"data": None})
-        if not r or not r.get("result"):
-            return {"ok": False, "message": "No result", "raw": r}
+        if not r:
+            return {"ok": False, "message": "No response", "raw": None}
+        # Debug: save raw response
+        self._last_raw_response = r
+        if "result" not in r:
+            return {"ok": False, "message": f"No 'result' in response. Keys: {list(r.keys())}", "raw": str(r)[:1000]}
         self.raw_record_b64 = r["result"]
+        if r["result"] is None:
+            return {"ok": False, "message": "result is None", "raw": str(r)[:1000]}
         dec = decrypt_player_record(r["result"], self.firebase_uid or "", self.password, self.email)
         if dec.get("success"):
             self.record = dec["record"]
             return {"ok": True, "record": self.record}
-        return {"ok": False, "message": dec.get("message", "Decrypt failed"), "raw": r["result"][:200]}
+        return {"ok": False, "message": dec.get("message", "Decrypt failed"), "raw": str(r["result"])[:500]}
 
     # ── Car / Garage Server Ops ─────────────
     async def get_all_cars(self) -> Dict:
@@ -536,9 +542,12 @@ async def interactive():
         print(f"\n[+] Full record saved to: {dump_file}")
         print("    >>> OPEN THIS FILE TO SEE THE EXACT STRUCTURE <<<")
     else:
-        print(f"[!] Could not decrypt record: {ld.get('message')}")
-        print(f"[!] Raw preview: {ld.get('raw', 'N/A')}")
+        print(f"[!] Could not load record: {ld.get('message')}")
+        raw = ld.get('raw')
+        if raw:
+            print(f"[!] Raw preview: {raw[:500]}")
         print("    CPM2 may use a different encryption/format than CPM1.")
+        print("    Try option [21] to dump raw response.")
 
     # ── STEP 2: CHECK GARAGE ────────────────
     print("\n" + "="*50)
@@ -588,7 +597,7 @@ async def interactive():
         print("  [18] Get Rewards")
         print("  [19] Ping Server")
         print("  [20] Get User Connection Data")
-        print("  [21] Dump Raw Record to File")
+        print("  [21] Dump Last Server Response")
         print("  [0]  Exit")
         print("="*50)
         print("\nNOTE: For car unlock, use Buy Car (option 5) with IDs")
@@ -666,12 +675,16 @@ async def interactive():
             r = await client.get_user_connection()
             print(json.dumps(r, indent=2)[:1000])
         elif choice == "21":
-            if client.raw_record_b64:
+            if hasattr(client, '_last_raw_response') and client._last_raw_response:
+                with open("cpm2_last_response.json", "w", encoding="utf-8") as f:
+                    json.dump(client._last_raw_response, f, indent=2, ensure_ascii=False)
+                print("[+] Saved last server response to cpm2_last_response.json")
+            elif client.raw_record_b64:
                 with open("cpm2_raw_record.b64", "w") as f:
                     f.write(client.raw_record_b64)
                 print("[+] Saved to cpm2_raw_record.b64")
             else:
-                print("[!] No raw record loaded yet")
+                print("[!] No raw response yet. Run option 1 first.")
         else:
             print("[!] Invalid choice")
 
