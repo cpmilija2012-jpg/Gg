@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CPM2 Server Interaction Tool
-============================
+CPM2 Server Tool — Research Edition
+====================================
 Built from leaked CPM2 cloud function endpoints.
-Supports: Firebase auth, player record R/W, car/coin/money ops, rating, etc.
 
-Usage:
-    python cpm2_tool.py
+APPROACH:
+  1. Login & load raw player record
+  2. INSPECT the record structure (JSON dump) before any edits
+  3. Use SERVER endpoints (BuyCar, CheckGarage, GetAllCars) instead of
+     blindly writing to unknown fields.
+  4. Only modify KNOWN fields: money, coin, Name, localID.
+
+CPM2 Facts:
+  • ~150-170 total cars (not 250)
+  • Garage has 20 slots
+  • Endpoints are v23_1 / v22_1 (different from CPM1)
+  • Player record structure may differ from CPM1
 """
 
 import asyncio
@@ -16,24 +25,20 @@ import base64
 import brotli
 import hashlib
 import json
-import re
 import struct
 import sys
 import time
 import zlib
 from copy import deepcopy
 from datetime import datetime
-from html import escape
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 try:
     from Crypto.Cipher import AES
-    from Crypto.Util.Padding import pad, unpad
+    from Crypto.Util.Padding import unpad
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
-    print("[!] pip install pycryptodome for AES support")
 
 # ═══════════════════════════════════════════
 #  ⚙️  CONFIG
@@ -43,22 +48,13 @@ API_KEY = "AIzaSyCQDz9rgjgmvmFkvVfmvr2-7fT4tfrzRRQ"
 BASE_URL = "https://europe-west1-cpm-2-7cea1.cloudfunctions.net"
 
 # ═══════════════════════════════════════════
-#  🌐 ENDPOINTS
+#  🌐 ENDPOINTS (from leak)
 # ═══════════════════════════════════════════
 
-ENDPOINTS = {
-    # Auth / Account
-    "can_sign_in_anon":    f"{BASE_URL}/CanSignInAnon22_1",
-    "can_sign_up":         f"{BASE_URL}/CanSignUp22_1",
-    "change_email_pass":   f"{BASE_URL}/ChangeEmailAndPassword23_1",
-    "delete_account":      f"{BASE_URL}/DeleteAccount23_1",
-    "migrate_anon":        f"{BASE_URL}/MigrateAnonymous23_1",
-    "fix_local_id_email":  f"{BASE_URL}/FixLocalIdAndEmail23_1",
-    "is_email_in_use":     f"{BASE_URL}/IsEmailInUse23_1",
-    "check_local_id":      f"{BASE_URL}/CheckLocalIDUniqueOrGenerateNew22_1",
-    "save_app_version":    f"{BASE_URL}/SaveAppVersionOnAccountCreated22_1",
-    "get_user_conn":       f"{BASE_URL}/GetUserConnectionData23_1",
-    "get_user_conn_22":    f"{BASE_URL}/GetUserConnectionData22_1",
+EP = {
+    # Auth
+    "login":               f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={API_KEY}",
+    "refresh":             f"https://securetoken.googleapis.com/v1/token?key={API_KEY}",
 
     # Player Data
     "get_player_records":  f"{BASE_URL}/GetPlayerRecords23_1",
@@ -70,7 +66,7 @@ ENDPOINTS = {
     "spend_coins":         f"{BASE_URL}/SpendCoins23_1",
     "save_wallet":         f"{BASE_URL}/SaveWalletData23_1",
 
-    # Cars
+    # Cars / Garage
     "get_all_cars":        f"{BASE_URL}/GetAllCars23_1",
     "get_car_price":       f"{BASE_URL}/GetCarPrice23_1",
     "buy_car":             f"{BASE_URL}/BuyCar23_1",
@@ -83,13 +79,13 @@ ENDPOINTS = {
     "mp_exchange_cars":    f"{BASE_URL}/MPExchangeCars23_1",
     "are_cars_desync":     f"{BASE_URL}/AreCarsDesynchronized23_1",
 
-    # Inventory / Parts
+    # Inventory
     "save_engine_inv":     f"{BASE_URL}/SaveEngineInventory23_1",
     "save_parts_inv":      f"{BASE_URL}/SavePartsInventory23_1",
     "save_slots":          f"{BASE_URL}/SaveSlotsCollection23_1",
     "save_plate_vinyls":   f"{BASE_URL}/SavePlateVinyls23_1",
 
-    # Social / Friends
+    # Social
     "save_friends":        f"{BASE_URL}/SaveFriends23_1",
 
     # Rating / Racing
@@ -119,6 +115,8 @@ ENDPOINTS = {
 
     # Misc
     "ping":                f"{BASE_URL}/Ping23_1",
+    "get_user_conn":       f"{BASE_URL}/GetUserConnectionData23_1",
+    "get_user_conn_22":    f"{BASE_URL}/GetUserConnectionData22_1",
 }
 
 GAME_HEADERS = {
@@ -130,7 +128,7 @@ GAME_HEADERS = {
 }
 
 # ═══════════════════════════════════════════
-#  🔐 CRYPTO
+#  🔐 CRYPTO (CPM1-based, may differ in CPM2)
 # ═══════════════════════════════════════════
 
 def make_xor_key(uid: str) -> bytes:
@@ -170,27 +168,22 @@ def build_aes_keys(uid, password=None, email=None):
     return keys
 
 # ═══════════════════════════════════════════
-#  📖 READER / WRITER
+#  📖 READER / PARSER (CPM1-based)
 # ═══════════════════════════════════════════
 
 class Reader:
     def __init__(self, data):
         self.buf = data; self.pos = 0
-
     def has_bytes(self, n): return self.pos + n <= len(self.buf)
-
     def read_byte(self):
         if not self.has_bytes(1): return 0
         v = self.buf[self.pos]; self.pos += 1; return v
-
     def read_int(self):
         if not self.has_bytes(4): self.pos = len(self.buf); return 0
         v = struct.unpack_from("<i", self.buf, self.pos)[0]; self.pos += 4; return v
-
     def read_float(self):
         if not self.has_bytes(4): self.pos = len(self.buf); return 0.0
         v = struct.unpack_from("<f", self.buf, self.pos)[0]; self.pos += 4; return v
-
     def read_string(self):
         marker = self.read_int()
         if marker in (0, -1): return ""
@@ -201,7 +194,6 @@ class Reader:
         text = self.buf[self.pos:self.pos + length].decode("utf-8", errors="replace")
         self.pos += length
         return text.replace("\x00", "").strip()
-
     def read_list(self, item_fn):
         count = self.read_int()
         if count <= 0 or count > 1_000_000: return []
@@ -211,7 +203,6 @@ class Reader:
             v = item_fn()
             if v is not None: result.append(v)
         return result
-
     def read_dict(self):
         count = self.read_int()
         if count <= 0 or count > 1_000_000: return {}
@@ -220,25 +211,18 @@ class Reader:
             if self.pos >= len(self.buf): break
             d[self.read_int()] = self.read_int()
         return d
-
     def read_equipment(self):
         if self.read_byte() == 0: return None
         return {
-            "hair": self.read_list(self.read_int),
-            "face": self.read_list(self.read_int),
-            "beard": self.read_list(self.read_int),
-            "cap": self.read_list(self.read_int),
-            "mask": self.read_list(self.read_int),
-            "top": self.read_list(self.read_int),
-            "gloves": self.read_list(self.read_int),
-            "bag": self.read_list(self.read_int),
-            "pants": self.read_list(self.read_int),
-            "shoes": self.read_list(self.read_int),
+            "hair": self.read_list(self.read_int), "face": self.read_list(self.read_int),
+            "beard": self.read_list(self.read_int), "cap": self.read_list(self.read_int),
+            "mask": self.read_list(self.read_int), "top": self.read_list(self.read_int),
+            "gloves": self.read_list(self.read_int), "bag": self.read_list(self.read_int),
+            "pants": self.read_list(self.read_int), "shoes": self.read_list(self.read_int),
             "glasses": self.read_list(self.read_int),
             "SelectedEquipments": self.read_list(self.read_int),
             "Gender": self.read_int(),
         }
-
 
 def parse_player(buf):
     r = Reader(buf)
@@ -247,11 +231,9 @@ def parse_player(buf):
     p["Name"] = r.read_string(); p["money"] = r.read_int()
     p["coin"] = r.read_int(); p["localID"] = r.read_string()
     p["boughtFsos"] = r.read_list(r.read_int)
-
     def read_friend():
         r.read_byte()
         return {"id": r.read_string(), "Name": r.read_string(), "accountID": r.read_string()}
-
     p["FriendsID"] = r.read_list(read_friend)
     p["LevelsDoneTime"] = r.read_list(r.read_float)
     p["floats"] = r.read_list(r.read_float)
@@ -262,7 +244,6 @@ def parse_player(buf):
     p["favouriteEmojis"] = r.read_list(r.read_int)
     p["personEquipmentsMale"] = r.read_equipment()
     p["personEquipmentsFemale"] = r.read_equipment()
-
     if r.read_byte() == 0:
         p["platesData"] = None
     else:
@@ -276,7 +257,6 @@ def parse_player(buf):
             return {"plateId": r.read_int(), "frontCarId": r.read_int(),
                     "rearCarId": r.read_int(), "vinyls": r.read_list(read_vinyl)}
         p["platesData"] = {"allPlates": r.read_list(read_plate)}
-
     if r.read_byte() == 0:
         p["carIDnStatus"] = None
     else:
@@ -284,7 +264,6 @@ def parse_player(buf):
             "carGeneratedIDs": r.read_list(r.read_string),
             "carStatus": r.read_list(r.read_int),
         }
-
     p["allData"] = r.read_string()
     p["flags"] = r.read_dict()
     p["animations"] = r.read_list(r.read_int)
@@ -293,7 +272,6 @@ def parse_player(buf):
     p["boughtPoliceLights"] = r.read_list(r.read_int)
     p["boughtPoliceSirens"] = r.read_list(r.read_int)
     return p
-
 
 def try_parse(buf):
     candidates = [buf]
@@ -315,165 +293,26 @@ def try_parse(buf):
         except: pass
     return None
 
-
 def decrypt_player_record(base64_text, uid, password=None, email=None):
     try: buf = base64.b64decode(base64_text)
     except: return {"success": False, "message": "Bad base64"}
     if len(buf) < 10: return {"success": False, "message": "Too small"}
-
     direct = try_parse(buf)
     if direct: return {"success": True, "record": direct}
-
     if uid:
         try:
             xp = xor_bytes(buf, make_xor_key(uid))
-            d  = decompress(xp)
+            d = decompress(xp)
             if d:
                 p = try_parse(d)
                 if p: return {"success": True, "record": p}
         except: pass
-
     for key in build_aes_keys(uid or "", password, email):
         plain = decrypt_aes(buf, key)
         if not plain: continue
         p = try_parse(plain)
         if p: return {"success": True, "record": p}
-
     return {"success": False, "message": "Could not decrypt"}
-
-
-class Writer:
-    def __init__(self): self._p: List[bytes] = []
-    def write_byte(self, v): self._p.append(bytes([v & 0xFF]))
-    def write_int(self, v):  self._p.append(struct.pack("<i", int(v or 0)))
-    def write_float(self, v): self._p.append(struct.pack("<f", float(v or 0.0)))
-
-    def write_string(self, s):
-        if s is None: self._p.append(struct.pack("<i", -1)); return
-        s = str(s)
-        if s == "": self._p.append(struct.pack("<i", 0)); return
-        enc = s.encode("utf-8")
-        self._p.append(struct.pack("<ii", -(len(enc)) - 1, len(s)) + enc)
-
-    def write_list(self, lst, fn):
-        if lst is None: self._p.append(struct.pack("<i", -1)); return
-        self._p.append(struct.pack("<i", len(lst)))
-        for item in lst: fn(item)
-
-    def write_equipment(self, data):
-        if not data: self.write_byte(0); return
-        self.write_byte(13)
-        for k in ["hair","face","beard","cap","mask","top","gloves","bag","pants","shoes","glasses","SelectedEquipments"]:
-            self.write_list(data.get(k, []), self.write_int)
-        self.write_int(data.get("Gender", 0))
-
-    def write_plates(self, data):
-        if not data: self.write_byte(0); return
-        self.write_byte(1)
-        plates = data.get("allPlates", [])
-        self._p.append(struct.pack("<i", len(plates)))
-        for plate in plates:
-            self.write_byte(4)
-            self.write_int(plate.get("plateId", 0))
-            self.write_int(plate.get("frontCarId", 0))
-            self.write_int(plate.get("rearCarId", 0))
-            vinyls = plate.get("vinyls", [])
-            self._p.append(struct.pack("<i", len(vinyls)))
-            for vinyl in vinyls:
-                self.write_byte(4)
-                vecs = vinyl.get("vectors", [])
-                self._p.append(struct.pack("<i", len(vecs)))
-                for vec in vecs:
-                    self._p.append(struct.pack("<fff", vec.get("x",0), vec.get("y",0), vec.get("z",0)))
-                self.write_list(vinyl.get("v", []), self.write_string)
-                self.write_list(vinyl.get("floats", []), self.write_float)
-                self.write_string(vinyl.get("text", ""))
-
-    def write_car_id_status(self, data):
-        if not data: self.write_byte(0); return
-        self.write_byte(2)
-        self.write_list(data.get("carGeneratedIDs", []), self.write_string)
-        self.write_list(data.get("carStatus", []), self.write_int)
-
-    def to_bytes(self): return b"".join(self._p)
-
-
-FIELD_MAPPING = [
-    (1,"localID"),(2,"money"),(3,"Name"),(4,"coin"),(5,"allData"),
-    (6,"boughtFsos"),(7,"boughtPoliceLights"),(8,"boughtPoliceSirens"),
-    (9,"FriendsID"),(10,"LevelsDoneTime"),(11,"floats"),(12,"integers"),
-    (13,"fcar"),(14,"favouriteWheels"),(15,"favouriteVinyls"),
-    (16,"favouriteEmojis"),(18,"emojiPacks"),
-    (41,"personEquipmentsMale"),(42,"personEquipmentsFemale"),
-    (43,"platesData"),(44,"carIDnStatus"),(45,"flags"),
-    (46,"animations"),(48,"wheels"),
-]
-
-INT_LIST_FIELDS   = {6,7,8,12,13,14,15,16,18,46,48}
-FLOAT_LIST_FIELDS = {10,11}
-ALWAYS_SEND       = {"allData"}
-
-
-def _field_modified(nv, ov):
-    if nv is None and ov is None: return False
-    if nv is None or ov is None: return True
-    if type(nv) != type(ov): return True
-    if isinstance(nv, (dict,list)):
-        return json.dumps(nv,sort_keys=True) != json.dumps(ov,sort_keys=True)
-    return nv != ov
-
-
-def serialize_field(fid, value):
-    w = Writer()
-    if fid in (1,3,5): w.write_string(value); return w.to_bytes()
-    if fid in (2,4): w.write_int(value or 0); return w.to_bytes()
-    if fid == 9:
-        friends = value or []
-        w._p.append(struct.pack("<i", len(friends)))
-        for f in friends:
-            w.write_byte(3)
-            w.write_string((f or {}).get("id",""))
-            w.write_string((f or {}).get("Name",""))
-            w.write_string((f or {}).get("accountID",""))
-        return w.to_bytes()
-    if fid in INT_LIST_FIELDS: w.write_list(value or [], w.write_int); return w.to_bytes()
-    if fid in FLOAT_LIST_FIELDS: w.write_list(value or [], w.write_float); return w.to_bytes()
-    if fid in (41,42): w.write_equipment(value); return w.to_bytes()
-    if fid == 43: w.write_plates(value); return w.to_bytes()
-    if fid == 44: w.write_car_id_status(value); return w.to_bytes()
-    if fid == 45:
-        flags = value or {}
-        w._p.append(struct.pack("<i", len(flags)))
-        for k, v in flags.items():
-            w.write_int(int(k)); w.write_int(int(v))
-        return w.to_bytes()
-    return None
-
-
-def build_payload(record, uid, original=None):
-    fields = []
-    for fid, key in FIELD_MAPPING:
-        value = record.get(key)
-        if value is None: continue
-        if key in ALWAYS_SEND:
-            should = isinstance(value, str) and len(value) > 0
-        elif original is not None:
-            should = _field_modified(value, original.get(key))
-        else:
-            should = True
-        if not should: continue
-        raw = serialize_field(fid, value)
-        if raw is not None: fields.append((fid, raw))
-
-    parts = [struct.pack("<i", len(fields))]
-    for fid, raw in fields:
-        parts.append(struct.pack("<hi", fid, len(raw)))
-        parts.append(raw)
-    combined   = b"".join(parts)
-    compressed = brotli.compress(combined)
-    encrypted  = xor_bytes(compressed, make_xor_key(uid))
-    return base64.b64encode(encrypted).decode("ascii")
-
 
 # ═══════════════════════════════════════════
 #  🎮 CPM2 CLIENT
@@ -487,9 +326,10 @@ class CPM2Client:
         self.firebase_uid: Optional[str] = None
         self.refresh_token: Optional[str] = None
         self.record: Dict[str, Any] = {}
-        self.original_record: Dict[str, Any] = {}
+        self.raw_record_b64: Optional[str] = None
+        self.all_cars: List[Dict] = []
+        self.garage_info: Dict[str, Any] = {}
 
-    # ── HTTP ────────────────────────────────
     async def _post(self, url: str, payload: Dict, headers: Optional[Dict] = None) -> Optional[Dict]:
         h = {**GAME_HEADERS}
         if headers: h.update(headers)
@@ -506,20 +346,16 @@ class CPM2Client:
             print(f"[HTTP Error] {e}")
             return None
 
-    # ── Auth ────────────────────────────────
     async def login(self, email: str, password: str) -> Dict:
-        self.email = email
-        self.password = password
-        url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={API_KEY}"
+        self.email = email; self.password = password
         p = {"email": email, "password": password, "returnSecureToken": True, "clientType": "CLIENT_TYPE_ANDROID"}
         try:
             timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout, connector=aiohttp.TCPConnector(ssl=False)) as s:
-                async with s.post(url, json=p, headers=GAME_HEADERS) as resp:
+                async with s.post(EP["login"], json=p, headers=GAME_HEADERS) as resp:
                     r = await resp.json(content_type=None)
         except Exception as e:
             return {"ok": False, "message": f"NETWORK_ERROR: {e}"}
-
         if "idToken" in r:
             self.auth_token = r["idToken"]
             self.refresh_token = r.get("refreshToken", "")
@@ -534,11 +370,10 @@ class CPM2Client:
                 r = await self.login(self.email, self.password)
                 return r.get("ok", False)
             return False
-        url = f"https://securetoken.googleapis.com/v1/token?key={API_KEY}"
         try:
             timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout, connector=aiohttp.TCPConnector(ssl=False)) as s:
-                async with s.post(url, json={"grant_type":"refresh_token","refresh_token":self.refresh_token},
+                async with s.post(EP["refresh"], json={"grant_type":"refresh_token","refresh_token":self.refresh_token},
                                   headers={"Content-Type":"application/json"}) as resp:
                     r = await resp.json(content_type=None)
                     if r and r.get("id_token"):
@@ -553,65 +388,58 @@ class CPM2Client:
 
     # ── Player Data ─────────────────────────
     async def load_player(self) -> Dict:
-        r = await self._post(ENDPOINTS["get_player_records"], {"data": None})
+        r = await self._post(EP["get_player_records"], {"data": None})
         if not r or not r.get("result"):
-            return {"ok": False, "message": "No result"}
+            return {"ok": False, "message": "No result", "raw": r}
+        self.raw_record_b64 = r["result"]
         dec = decrypt_player_record(r["result"], self.firebase_uid or "", self.password, self.email)
         if dec.get("success"):
-            self.original_record = deepcopy(dec["record"])
             self.record = dec["record"]
             return {"ok": True, "record": self.record}
-        return {"ok": False, "message": dec.get("message", "Decrypt failed")}
+        return {"ok": False, "message": dec.get("message", "Decrypt failed"), "raw": r["result"][:200]}
 
-    async def save_player(self, data: Optional[Dict] = None) -> Dict:
-        if data is None: data = self.record
-        if not self.firebase_uid:
-            return {"ok": False, "message": "No UID"}
-        payload = build_payload(data, self.firebase_uid, self.original_record)
-        r = await self._post(ENDPOINTS["save_player_records"],
-                             {"data": {"data": payload, "deviceId": self.firebase_uid[:8]}})
-        if r and r.get("result") in (1, True, "1"):
-            self.original_record = deepcopy(data)
-            return {"ok": True}
-        return {"ok": False, "message": str(r)[:200]}
+    # ── Car / Garage Server Ops ─────────────
+    async def get_all_cars(self) -> Dict:
+        r = await self._post(EP["get_all_cars"], {"data": None})
+        if r:
+            self.all_cars = r.get("result", []) if isinstance(r.get("result"), list) else []
+        return r or {}
 
-    # ── Modifiers ───────────────────────────
-    async def set_money(self, amount: int) -> Dict:
-        self.record["money"] = min(amount, 50_000_000)
-        return await self.save_player()
+    async def check_garage(self) -> Dict:
+        r = await self._post(EP["check_garage"], {"data": None})
+        if r:
+            self.garage_info = r.get("result", {}) if isinstance(r.get("result"), dict) else {}
+        return r or {}
 
-    async def set_coin(self, amount: int) -> Dict:
-        self.record["coin"] = min(amount, 500_000)
-        return await self.save_player()
+    async def buy_car(self, car_id: int) -> Dict:
+        return await self._post(EP["buy_car"], {"data": car_id})
 
-    async def set_name(self, name: str) -> Dict:
-        self.record["Name"] = name
-        return await self.save_player()
+    async def get_car_price(self, car_id: int) -> Dict:
+        return await self._post(EP["get_car_price"], {"data": car_id})
 
-    async def set_player_id(self, pid: str) -> Dict:
-        self.record["localID"] = pid.upper()
-        return await self.save_player()
+    async def save_car(self, car_data: Dict) -> Dict:
+        return await self._post(EP["save_car"], {"data": car_data})
 
-    async def unlock_all_cars(self) -> Dict:
-        self.record["fcar"] = list(set(self.record.get("fcar", []) + list(range(1, 250))))
-        return await self.save_player()
+    async def exchange_car_for_money(self, car_id: int) -> Dict:
+        return await self._post(EP["exchange_car_money"], {"data": car_id})
 
-    async def unlock_wheels(self) -> Dict:
-        self.record["wheels"] = list(set(self.record.get("wheels", []) + list(range(73, 221))))
-        it = self.record.get("integers", [])
-        while len(it) < 113: it.append(0)
-        for i in [0,1,2,3,4,5,110,111,112]: it[i] = 1
-        self.record["integers"] = it
-        return await self.save_player()
+    async def remove_car_from_db(self, car_id: int) -> Dict:
+        return await self._post(EP["remove_car_db"], {"data": car_id})
 
-    async def unlock_animations(self) -> Dict:
-        self.record["animations"] = list(set(self.record.get("animations", []) + list(range(301))))
-        return await self.save_player()
+    # ── Economy ─────────────────────────────
+    async def get_money(self) -> Dict:
+        return await self._post(EP["get_money"], {"data": None})
 
-    async def complete_levels(self) -> Dict:
-        self.record["LevelsDoneTime"] = [0] + [120 if i == 43 else 1 for i in range(1, 110)]
-        return await self.save_player()
+    async def get_coins(self) -> Dict:
+        return await self._post(EP["get_coins"], {"data": None})
 
+    async def buy_money(self, amount: int) -> Dict:
+        return await self._post(EP["buy_money"], {"data": amount})
+
+    async def buy_coins(self, amount: int) -> Dict:
+        return await self._post(EP["buy_coins"], {"data": amount})
+
+    # ── Rating ──────────────────────────────
     async def set_rank(self) -> Dict:
         rd = {"RatingData": {"time":1e22,"cars":1e16,"car_fix":1e13,"car_collided":1e12,
             "car_exchange":1e13,"car_trade":1e13,"car_wash":1e13,"slicer_cut":1e13,
@@ -620,82 +448,40 @@ class CPM2Client:
             "speed_banner":1e9,"reactions":1e17,"run":1e9,"real_estate":1e9,
             "t_distance":1e10,"treasure":1e10,"block_post":1e10,"push_ups":1e12,
             "burnt_tire":1e10,"passanger_distance":1e8}}
-        r = await self._post(ENDPOINTS["set_user_rating"], {"data": json.dumps(rd)})
-        if r and r.get("result") in (1, True, "1"):
-            return {"ok": True}
-        return {"ok": False, "message": "RANK_FAILED"}
-
-    # ── Economy ─────────────────────────────
-    async def get_money(self) -> Dict:
-        return await self._post(ENDPOINTS["get_money"], {"data": None})
-
-    async def get_coins(self) -> Dict:
-        return await self._post(ENDPOINTS["get_coins"], {"data": None})
-
-    async def buy_money(self, amount: int) -> Dict:
-        return await self._post(ENDPOINTS["buy_money"], {"data": amount})
-
-    async def buy_coins(self, amount: int) -> Dict:
-        return await self._post(ENDPOINTS["buy_coins"], {"data": amount})
-
-    # ── Cars ────────────────────────────────
-    async def get_all_cars(self) -> Dict:
-        return await self._post(ENDPOINTS["get_all_cars"], {"data": None})
-
-    async def buy_car(self, car_id: int) -> Dict:
-        return await self._post(ENDPOINTS["buy_car"], {"data": car_id})
-
-    async def save_car(self, car_data: Dict) -> Dict:
-        return await self._post(ENDPOINTS["save_car"], {"data": car_data})
-
-    async def check_garage(self) -> Dict:
-        return await self._post(ENDPOINTS["check_garage"], {"data": None})
-
-    # ── Misc ────────────────────────────────
-    async def ping(self) -> Dict:
-        return await self._post(ENDPOINTS["ping"], {"data": None})
-
-    async def get_rewards(self) -> Dict:
-        return await self._post(ENDPOINTS["get_rewards"], {"data": None})
-
-    async def get_offers(self) -> Dict:
-        return await self._post(ENDPOINTS["get_offers"], {"data": None})
-
-    async def get_all_events(self) -> Dict:
-        return await self._post(ENDPOINTS["get_all_events"], {"data": None})
+        return await self._post(EP["set_user_rating"], {"data": json.dumps(rd)})
 
     async def get_user_rating(self) -> Dict:
-        return await self._post(ENDPOINTS["get_user_rating"], {"data": None})
+        return await self._post(EP["get_user_rating"], {"data": None})
 
     async def validate_rank(self) -> Dict:
-        return await self._post(ENDPOINTS["validate_rank"], {"data": None})
+        return await self._post(EP["validate_rank"], {"data": None})
+
+    # ── Events / Misc ───────────────────────
+    async def get_all_events(self) -> Dict:
+        return await self._post(EP["get_all_events"], {"data": None})
+
+    async def get_offers(self) -> Dict:
+        return await self._post(EP["get_offers"], {"data": None})
+
+    async def get_rewards(self) -> Dict:
+        return await self._post(EP["get_rewards"], {"data": None})
 
     async def get_daily_task(self) -> Dict:
-        return await self._post(ENDPOINTS["get_daily_task"], {"data": None})
+        return await self._post(EP["get_daily_task"], {"data": None})
+
+    async def ping(self) -> Dict:
+        return await self._post(EP["ping"], {"data": None})
 
     async def get_user_connection(self) -> Dict:
-        return await self._post(ENDPOINTS["get_user_conn"], {"data": None})
+        return await self._post(EP["get_user_conn"], {"data": None})
 
-    # ── Batch unlock ────────────────────────
-    async def unlock_all(self):
-        ops = [
-            ("Money", lambda: self.set_money(50_000_000)),
-            ("Coins", lambda: self.set_coin(500_000)),
-            ("Cars", self.unlock_all_cars),
-            ("Wheels", self.unlock_wheels),
-            ("Animations", self.unlock_animations),
-            ("Levels", self.complete_levels),
-            ("Rank", self.set_rank),
-        ]
-        results = []
-        for name, fn in ops:
-            try:
-                r = await fn()
-                results.append((name, r.get("ok", False)))
-            except Exception as e:
-                results.append((name, False))
-            await asyncio.sleep(0.3)
-        return results
+    # ── Save Player Record (DANGER) ─────────
+    async def save_player_record(self, record: Dict) -> Dict:
+        """WARNING: Only use after inspecting the record structure!
+        CPM2 may use a different format than CPM1."""
+        # This is a placeholder — CPM2 payload format is unknown
+        # You would need to implement proper serialization for v23_1
+        return {"ok": False, "message": "Not implemented — inspect record first"}
 
 
 # ═══════════════════════════════════════════
@@ -710,7 +496,7 @@ def print_banner():
   ██║     ██╔═══╝ ██║╚██╔╝██║██╔══██╗
   ╚██████╗██║     ██║ ╚═╝ ██║██║  ██║
    ╚═════╝╚═╝     ╚═╝     ╚═╝╚═╝  ╚═╝
-         CPM2 Server Tool v1.0
+      CPM2 Research Tool v1.0
 """)
 
 async def interactive():
@@ -726,101 +512,166 @@ async def interactive():
         return
     print(f"[+] Logged in! UID: {client.firebase_uid}")
 
-    print("[+] Loading player data...")
+    # ── STEP 1: INSPECT RECORD ──────────────
+    print("\n" + "="*50)
+    print("STEP 1: Loading & inspecting player record...")
+    print("="*50)
     ld = await client.load_player()
     if ld.get("ok"):
         rec = ld["record"]
-        print(f"[+] Name: {rec.get('Name')}")
+        print(f"\n[+] Name: {rec.get('Name')}")
         print(f"[+] Money: {rec.get('money', 0):,}")
         print(f"[+] Coins: {rec.get('coin', 0):,}")
-        print(f"[+] Cars: {len(rec.get('fcar', []))}")
-    else:
-        print(f"[!] Could not load: {ld.get('message')}")
+        print(f"[+] Player ID: {rec.get('localID')}")
+        print(f"[+] Cars in fcar: {len(rec.get('fcar', []))}")
+        print(f"[+] Garage slots (carIDnStatus): {len(rec.get('carIDnStatus', {}).get('carGeneratedIDs', [])) if rec.get('carIDnStatus') else 0}")
+        print(f"[+] Wheels: {len(rec.get('wheels', []))}")
+        print(f"[+] Animations: {len(rec.get('animations', []))}")
+        print(f"[+] Friends: {len(rec.get('FriendsID', []))}")
 
+        # Dump full record to file for analysis
+        dump_file = f"cpm2_record_{client.firebase_uid}.json"
+        with open(dump_file, "w", encoding="utf-8") as f:
+            json.dump(rec, f, indent=2, ensure_ascii=False)
+        print(f"\n[+] Full record saved to: {dump_file}")
+        print("    >>> OPEN THIS FILE TO SEE THE EXACT STRUCTURE <<<")
+    else:
+        print(f"[!] Could not decrypt record: {ld.get('message')}")
+        print(f"[!] Raw preview: {ld.get('raw', 'N/A')}")
+        print("    CPM2 may use a different encryption/format than CPM1.")
+
+    # ── STEP 2: CHECK GARAGE ────────────────
+    print("\n" + "="*50)
+    print("STEP 2: Checking garage via server...")
+    print("="*50)
+    g = await client.check_garage()
+    print(json.dumps(g, indent=2)[:2000])
+
+    # ── STEP 3: GET ALL CARS ────────────────
+    print("\n" + "="*50)
+    print("STEP 3: Getting all available cars from server...")
+    print("="*50)
+    c = await client.get_all_cars()
+    cars = client.all_cars
+    print(f"[+] Server returned {len(cars)} cars")
+    if cars and len(cars) > 0:
+        print("\nFirst 10 cars:")
+        for i, car in enumerate(cars[:10]):
+            print(f"  {i+1}. {json.dumps(car)[:150]}")
+        # Save full list
+        with open("cpm2_all_cars.json", "w", encoding="utf-8") as f:
+            json.dump(cars, f, indent=2, ensure_ascii=False)
+        print("\n[+] Full car list saved to: cpm2_all_cars.json")
+
+    # ── MAIN MENU ───────────────────────────
     while True:
-        print("\n" + "="*40)
-        print("  [1] Set Money ($50M)")
-        print("  [2] Set Coins (500K)")
-        print("  [3] Unlock All Cars")
-        print("  [4] Unlock Wheels")
-        print("  [5] Unlock Animations")
-        print("  [6] Complete All Levels")
-        print("  [7] Set Max Rank")
-        print("  [8] ★ UNLOCK ALL ★")
-        print("  [9] Change Name")
-        print("  [10] Change Player ID")
-        print("  [11] Get All Cars (server)")
-        print("  [12] Get Offers")
-        print("  [13] Get Events")
-        print("  [14] Get User Rating")
-        print("  [15] Validate Rank")
-        print("  [16] Get Daily Task")
-        print("  [17] Ping Server")
-        print("  [18] Save Current Record")
-        print("  [0] Exit")
-        print("="*40)
+        print("\n" + "="*50)
+        print("MAIN MENU")
+        print("="*50)
+        print("  [1]  Inspect Player Record (JSON dump)")
+        print("  [2]  Check Garage")
+        print("  [3]  Get All Cars")
+        print("  [4]  Get Car Price (by ID)")
+        print("  [5]  Buy Car (by ID)")
+        print("  [6]  Exchange Car for Money")
+        print("  [7]  Remove Car from DB")
+        print("  [8]  Get Money")
+        print("  [9]  Get Coins")
+        print("  [10] Buy Money (server)")
+        print("  [11] Buy Coins (server)")
+        print("  [12] Get User Rating")
+        print("  [13] Set Max Rank")
+        print("  [14] Validate Rank")
+        print("  [15] Get All Events")
+        print("  [16] Get Offers")
+        print("  [17] Get Daily Task")
+        print("  [18] Get Rewards")
+        print("  [19] Ping Server")
+        print("  [20] Get User Connection Data")
+        print("  [21] Dump Raw Record to File")
+        print("  [0]  Exit")
+        print("="*50)
+        print("\nNOTE: For car unlock, use Buy Car (option 5) with IDs")
+        print("      from the car list. Garage limit = 20 slots.")
+        print("="*50)
         choice = input("> ").strip()
 
         if choice == "0":
             break
         elif choice == "1":
-            r = await client.set_money(50_000_000)
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
+            print(json.dumps(client.record, indent=2)[:3000])
         elif choice == "2":
-            r = await client.set_coin(500_000)
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
+            r = await client.check_garage()
+            print(json.dumps(r, indent=2)[:2000])
         elif choice == "3":
-            r = await client.unlock_all_cars()
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
-        elif choice == "4":
-            r = await client.unlock_wheels()
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
-        elif choice == "5":
-            r = await client.unlock_animations()
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
-        elif choice == "6":
-            r = await client.complete_levels()
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
-        elif choice == "7":
-            r = await client.set_rank()
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
-        elif choice == "8":
-            print("[+] Running batch unlock...")
-            results = await client.unlock_all()
-            for name, ok in results:
-                print(f"  {'✓' if ok else '✗'} {name}")
-        elif choice == "9":
-            name = input("[?] New name: ").strip()
-            r = await client.set_name(name)
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
-        elif choice == "10":
-            pid = input("[?] New Player ID: ").strip()
-            r = await client.set_player_id(pid)
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
-        elif choice == "11":
             r = await client.get_all_cars()
-            print(json.dumps(r, indent=2)[:1000])
+            print(f"[+] {len(client.all_cars)} cars")
+            for i, car in enumerate(client.all_cars[:20]):
+                print(f"  {i+1}. {json.dumps(car)[:120]}")
+        elif choice == "4":
+            cid = int(input("[?] Car ID: ").strip())
+            r = await client.get_car_price(cid)
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "5":
+            cid = int(input("[?] Car ID to buy: ").strip())
+            r = await client.buy_car(cid)
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "6":
+            cid = int(input("[?] Car ID to exchange: ").strip())
+            r = await client.exchange_car_for_money(cid)
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "7":
+            cid = int(input("[?] Car ID to remove: ").strip())
+            r = await client.remove_car_from_db(cid)
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "8":
+            r = await client.get_money()
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "9":
+            r = await client.get_coins()
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "10":
+            amt = int(input("[?] Amount: ").strip())
+            r = await client.buy_money(amt)
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "11":
+            amt = int(input("[?] Amount: ").strip())
+            r = await client.buy_coins(amt)
+            print(json.dumps(r, indent=2)[:500])
         elif choice == "12":
-            r = await client.get_offers()
-            print(json.dumps(r, indent=2)[:1000])
-        elif choice == "13":
-            r = await client.get_all_events()
-            print(json.dumps(r, indent=2)[:1000])
-        elif choice == "14":
             r = await client.get_user_rating()
             print(json.dumps(r, indent=2)[:1000])
-        elif choice == "15":
+        elif choice == "13":
+            r = await client.set_rank()
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "14":
             r = await client.validate_rank()
+            print(json.dumps(r, indent=2)[:500])
+        elif choice == "15":
+            r = await client.get_all_events()
             print(json.dumps(r, indent=2)[:1000])
         elif choice == "16":
-            r = await client.get_daily_task()
+            r = await client.get_offers()
             print(json.dumps(r, indent=2)[:1000])
         elif choice == "17":
+            r = await client.get_daily_task()
+            print(json.dumps(r, indent=2)[:1000])
+        elif choice == "18":
+            r = await client.get_rewards()
+            print(json.dumps(r, indent=2)[:1000])
+        elif choice == "19":
             r = await client.ping()
             print(json.dumps(r, indent=2)[:500])
-        elif choice == "18":
-            r = await client.save_player()
-            print("[+] OK" if r.get("ok") else f"[!] {r.get('message')}")
+        elif choice == "20":
+            r = await client.get_user_connection()
+            print(json.dumps(r, indent=2)[:1000])
+        elif choice == "21":
+            if client.raw_record_b64:
+                with open("cpm2_raw_record.b64", "w") as f:
+                    f.write(client.raw_record_b64)
+                print("[+] Saved to cpm2_raw_record.b64")
+            else:
+                print("[!] No raw record loaded yet")
         else:
             print("[!] Invalid choice")
 
