@@ -600,14 +600,26 @@ class CPM1Client:
     async def unlock_houses(self):      return await self._set_integers([(8,1),(110,1),(111,1),(112,1)])
 
     async def complete_levels(self):
-        lvl = [0] + [120 if i==43 else 1 for i in range(1,110)]
+        lvl = [0] + [120 if i==43 else 1 for i in range(1,201)]
         return await self._modify({"LevelsDoneTime": lvl})
 
     async def unlock_all_cars(self):
         await self.load()
         d = deepcopy(self.record)
-        if not d or not d.get("Name"): return {"ok":False,"message":"Could not load account data."}
-        d["fcar"] = list(set(d.get("fcar", []) + list(range(1, 250))))
+        if not d or not d.get("Name"): 
+            return {"ok":False,"message":"Could not load account data."}
+        
+        # 0-500 pokriva sve: BMW E36 (ID 0), sva vozila do najnovijeg update-a
+        all_cars = list(range(0, 501))
+        
+        # Otključaj u glavnoj listi vozila
+        current_fcar = d.get("fcar", [])
+        d["fcar"] = list(set(current_fcar + all_cars))
+        
+        # KLJUČNO: Sinkroniziraj boughtFsos bez čega igrica ne prikazuje aute
+        current_bought = d.get("boughtFsos", [])
+        d["boughtFsos"] = list(set(current_bought + all_cars))
+        
         return await self._save(d)
 
     async def set_rank(self):
@@ -671,7 +683,7 @@ class CPM1Client:
                 results.append((name, r.get("ok", False)))
             except Exception as e:
                 results.append((name, False))
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.4)
         return results
 
 
@@ -690,7 +702,7 @@ def banner():
   ██║     ██╔═══╝ ██║╚██╔╝██║       ██║   ██║   ██║██║   ██║██║     
   ╚██████╗██║     ██║ ╚═╝ ██║       ██║   ╚██████╔╝╚██████╔╝███████╗
    ╚═════╝╚═╝     ╚═╝     ╚═╝       ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝
-                    CPM1 All-In-One Tool v2.0
+                    CPM1 All-In-One Tool v2.1
 """)
 
 def fmt(n): return f"{int(n):,}"
