@@ -384,12 +384,17 @@ def build_payload(record, uid, original=None):
     for fid, key in FIELD_MAPPING:
         value = record.get(key)
         if value is None: continue
-        if key in ALWAYS_SEND:
+        
+        # Forsiraj slanje allData ako postoji u recordu (čak i prazan string)
+        if key == "allData":
+            should = True
+        elif key in ALWAYS_SEND:
             should = isinstance(value, str) and len(value) > 0
         elif original is not None:
             should = _field_modified(value, original.get(key))
         else:
             should = True
+            
         if not should: continue
         raw = serialize_field(fid, value)
         if raw is not None: fields.append((fid, raw))
@@ -609,18 +614,52 @@ class CPM1Client:
         if not d or not d.get("Name"): 
             return {"ok":False,"message":"Could not load account data."}
         
-        # 0-500 pokriva sve: BMW E36 (ID 0), sva vozila do najnovijeg update-a
-        all_cars = list(range(0, 501))
+        # "no car" slotovi s tvog videa (brojevi koji nemaju auto)
+        NO_CAR = {16,25,26,33,34,36,38,46,50,52,56,63,64,67,68,69,71,72,73,
+                  75,78,79,80,83,84,90,91,92,93,94,95,96,97,98,263,265,266,267,268}
         
-        # Otključaj u glavnoj listi vozila
-        current_fcar = d.get("fcar", [])
-        d["fcar"] = list(set(current_fcar + all_cars))
+        # Svi validni ID-jevi od 0 do 273 + 600 (nissan 400z)
+        VALID_IDS = sorted([i for i in range(0, 274) if i not in NO_CAR] + [600])
         
-        # KLJUČNO: Sinkroniziraj boughtFsos bez čega igrica ne prikazuje aute
-        current_bought = d.get("boughtFsos", [])
-        d["boughtFsos"] = list(set(current_bought + all_cars))
+        # 1. boughtFsos = GLAVNO polje za vlasništvo (KLJUČNO!)
+        current_bought = set(d.get("boughtFsos", []))
+        current_bought.update(VALID_IDS)
+        d["boughtFsos"] = sorted(current_bought)
         
-        return await self._save(d)
+        # 2. fcar = isto kao boughtFsos (za svaki slučaj)
+        d["fcar"] = list(d["boughtFsos"])
+        
+        # 3. carIDnStatus - MORA postojati i biti točne dužine
+        cid = d.get("carIDnStatus")
+        if not cid:
+            cid = {"carGeneratedIDs": [], "carStatus": []}
+        
+        ids = list(cid.get("carGeneratedIDs", []))
+        status = list(cid.get("carStatus", []))
+        target = len(d["boughtFsos"])
+        
+        while len(ids) < target:
+            ids.append(f"cpm_{len(ids):04d}")
+            status.append(1)  # 1 = otključan/aktivan
+            
+        d["carIDnStatus"] = {
+            "carGeneratedIDs": ids[:target],
+            "carStatus": status[:target]
+        }
+        
+        # 4. KLJUČNO: Očisti allData da server koristi individualna polja
+        # allData je blob koji override-a sve ostalo ako nije prazan
+        d["allData"] = ""
+        
+        print(f"    [DEBUG] Unlocking {len(VALID_IDS)} valid car IDs...")
+        print(f"    [DEBUG] boughtFsos: {len(d['boughtFsos'])} | carIDnStatus: {len(d['carIDnStatus']['carStatus'])}")
+        
+        result = await self._save(d)
+        if result.get("ok"):
+            print(f"    [DEBUG] ✅ Save uspješan! Restartuj igricu.")
+        else:
+            print(f"    [DEBUG] ❌ Save failed: {result.get('message')}")
+        return result
 
     async def set_rank(self):
         await self.load()
@@ -702,7 +741,7 @@ def banner():
   ██║     ██╔═══╝ ██║╚██╔╝██║       ██║   ██║   ██║██║   ██║██║     
   ╚██████╗██║     ██║ ╚═╝ ██║       ██║   ╚██████╔╝╚██████╔╝███████╗
    ╚═════╝╚═╝     ╚═╝     ╚═╝       ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝
-                    CPM1 All-In-One Tool v2.1
+                    CPM1 All-In-One Tool v2.2
 """)
 
 def fmt(n): return f"{int(n):,}"
