@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CPM1 All-In-One Termux Tool v2.4
+CPM1 All-In-One Termux Tool v2.5
 ================================
 """
 
@@ -516,6 +516,16 @@ class CPM1Client:
             return {"ok":True}
         return {"ok":False,"message":msg2}
 
+    # FORSIRANI SAVE - šalje SVE polja bez obzira na original
+    async def _save_force(self, data):
+        ok,msg,auth = await self.get_auth()
+        if not ok: return {"ok":False,"message":msg}
+        ok2,msg2 = await self._send(data, None)  # None = pošalji SVE polja
+        if ok2:
+            self.original_record = deepcopy(data)
+            return {"ok":True}
+        return {"ok":False,"message":msg2}
+
     async def _modify(self, mods):
         await self.load()
         d = deepcopy(self.record)
@@ -598,78 +608,43 @@ class CPM1Client:
                   75,78,79,80,83,84,90,91,92,93,94,95,96,97,98,263,265,266,267,268}
         VALID_IDS = sorted([i for i in range(0, 274) if i not in NO_CAR])
 
-        all_data = d.get("allData", "")
-        print(f"    [DEBUG] allData type: {type(all_data)}")
-        print(f"    [DEBUG] allData len: {len(all_data) if all_data else 0}")
-        print(f"    [DEBUG] allData[:100]: {repr(all_data[:100]) if all_data else 'None/Empty'}")
+        # NE DIRAJ allData - to je hash/string koji igrica koristi interno
+        # d["allData"] ostaje kakav jest
 
-        modified = False
-
-        if all_data and len(all_data) > 10:
-            # Pokušaj 1: JSON
-            try:
-                inner = json.loads(all_data)
-                if isinstance(inner, dict):
-                    inner["boughtFsos"] = sorted(list(set(inner.get("boughtFsos", []) + VALID_IDS)))
-                    inner["fcar"] = sorted(list(set(inner.get("fcar", []) + VALID_IDS)))
-                    d["allData"] = json.dumps(inner, separators=(',',':'))
-                    modified = True
-                    print(f"    [DEBUG] allData = JSON, modified")
-            except Exception as e:
-                print(f"    [DEBUG] Not JSON: {e}")
-
-            # Pokušaj 2: CSV lista
-            if not modified:
-                try:
-                    ids = [int(x.strip()) for x in all_data.split(",") if x.strip().isdigit()]
-                    if len(ids) > 10:
-                        ids = sorted(list(set(ids + VALID_IDS)))
-                        d["allData"] = ",".join(str(x) for x in ids)
-                        modified = True
-                        print(f"    [DEBUG] allData = CSV, modified")
-                except Exception as e:
-                    print(f"    [DEBUG] Not CSV: {e}")
-
-            # Pokušaj 3: Base64 player record
-            if not modified:
-                try:
-                    if re.match(r'^[A-Za-z0-9+/=]+$', all_data):
-                        dec = decrypt_player_record(all_data, self.firebase_uid or "", self.password, self.email)
-                        if dec.get("success"):
-                            print(f"    [DEBUG] allData = base64 player record")
-                            inner = dec["record"]
-                            inner_bought = set(inner.get("boughtFsos", []))
-                            inner_bought.update(VALID_IDS)
-                            inner["boughtFsos"] = sorted(inner_bought)
-                            inner["fcar"] = list(inner["boughtFsos"])
-                            # Enkodiraj nazad: binary → brotli → xor → base64
-                            # Koristimo build_payload za enkodiranje cijelog recorda
-                            # Ali build_payload je za partial save...
-                            # Zato postavljamo na None i nadamo se individualnim poljima
-                            d["allData"] = None
-                            modified = True
-                        else:
-                            print(f"    [DEBUG] Base64 but not player record")
-                except Exception as e:
-                    print(f"    [DEBUG] Not base64: {e}")
-
-        if not modified:
-            d["allData"] = None
-            print(f"    [DEBUG] allData set to None")
-
-        # Individualna polja
+        # Postavi OBA polja za auta
         current_bought = set(d.get("boughtFsos", []))
         current_bought.update(VALID_IDS)
         d["boughtFsos"] = sorted(current_bought)
-        d["fcar"] = list(d["boughtFsos"])
 
-        print(f"    [DEBUG] boughtFsos: {len(d['boughtFsos'])} | fcar: {len(d['fcar'])}")
+        current_fcar = set(d.get("fcar", []))
+        current_fcar.update(VALID_IDS)
+        d["fcar"] = sorted(current_fcar)
 
-        result = await self._save(d)
+        # carIDnStatus - ako postoji, nadopuni ga
+        cid = d.get("carIDnStatus")
+        if cid:
+            ids = list(cid.get("carGeneratedIDs", []))
+            status = list(cid.get("carStatus", []))
+            target = len(d["fcar"])
+            while len(ids) < target:
+                ids.append(f"cpm_{len(ids):04d}")
+                status.append(1)
+            d["carIDnStatus"] = {
+                "carGeneratedIDs": ids[:target],
+                "carStatus": status[:target]
+            }
+
+        print(f"    [DEBUG] boughtFsos: {len(d['boughtFsos'])}")
+        print(f"    [DEBUG] fcar: {len(d['fcar'])}")
+        print(f"    [DEBUG] carIDnStatus: {len(d['carIDnStatus']['carStatus']) if d.get('carIDnStatus') else 'None'}")
+        print(f"    [DEBUG] allData: {repr(d['allData'][:20]) if d.get('allData') else 'None'} (NE DIRAM)")
+
+        # KORISTI _save_force da se pošalju SVA polja
+        result = await self._save_force(d)
         if result.get("ok"):
-            print(f"    [DEBUG] Save uspješan! ZATVORI IGRICU POTPUNO pa je ponovo otvori.")
+            print(f"    [DEBUG] ✅ Save uspješan! ZATVORI IGRICU POTPUNO pa je ponovo otvori.")
         else:
-            print(f"    [DEBUG] Save failed: {result.get('message')}")
+            print(f"    [DEBUG] ❌ Save failed: {result.get('message')}")
         return result
 
     async def set_rank(self):
@@ -752,7 +727,7 @@ def banner():
   ██║     ██╔═══╝ ██║╚██╔╝██║       ██║   ██║   ██║██║   ██║██║     
   ╚██████╗██║     ██║ ╚═╝ ██║       ██║   ╚██████╔╝╚██████╔╝███████╗
    ╚═════╝╚═╝     ╚═╝     ╚═╝       ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝
-                    CPM1 All-In-One Tool v2.4
+                    CPM1 All-In-One Tool v2.5
 """)
 
 def fmt(n): return f"{int(n):,}"
