@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CPM1 All-In-One Termux Tool v2.5
+CPM1 All-In-One Termux Tool v2.6
 ================================
+- FIX: _save_force šalje previše polja → server odbija
+- NOVO: _save_minimal šalje SAMO navedena polja
+- Unlock All Cars: minimalni payload (boughtFsos + fcar)
 """
 
 import asyncio
@@ -364,9 +367,17 @@ def serialize_field(fid, value):
     return None
 
 
-def build_payload(record, uid, original=None):
+# ═══════════════════════════════════════════
+#  v2.6 FIX: build_payload sada podržava fields_filter
+# ═══════════════════════════════════════════
+
+def build_payload(record, uid, original=None, fields_filter=None):
     fields = []
     for fid, key in FIELD_MAPPING:
+        # v2.6: Ako je fields_filter postavljen, preskoči polja koja nisu u listi
+        if fields_filter is not None and key not in fields_filter:
+            continue
+            
         value = record.get(key)
         if value is None: continue
         if key in ALWAYS_SEND:
@@ -495,10 +506,11 @@ class CPM1Client:
                 if k in v: return self._ok(v[k])
         return False
 
-    async def _send(self, record, original=None):
+    # v2.6: _send sada podržava fields_filter
+    async def _send(self, record, original=None, fields_filter=None):
         if not self.firebase_uid: return False,"NO_UID"
         try:
-            payload = build_payload(record, self.firebase_uid, original)
+            payload = build_payload(record, self.firebase_uid, original, fields_filter)
             r = await self._post(SAVE_URL,
                 {"data":{"data":payload,"deviceId":self.firebase_uid[:8]}},
                 {**GAME_HEADERS,"Authorization":f"Bearer {self.auth_token}","Connection":"Keep-Alive",
@@ -525,6 +537,31 @@ class CPM1Client:
             self.original_record = deepcopy(data)
             return {"ok":True}
         return {"ok":False,"message":msg2}
+
+    # ═══════════════════════════════════════════
+    #  v2.6 NOVO: _save_minimal - šalje SAMO navedena polja
+    # ═══════════════════════════════════════════
+    async def _save_minimal(self, data, fields_filter):
+        """
+        Šalje SAMO polja navedena u fields_filter listi.
+        Ignorira original_record - ne uspoređuje se ništa.
+        """
+        ok, msg, auth = await self.get_auth()
+        if not ok: return {"ok": False, "message": msg}
+        
+        # Izgradi minimalni record SAMO s traženim poljima
+        minimal = {k: deepcopy(data[k]) for k in fields_filter if k in data and data[k] is not None}
+        
+        if not minimal:
+            return {"ok": False, "message": "No fields to send"}
+        
+        ok2, msg2 = await self._send(minimal, None, fields_filter=fields_filter)
+        if ok2:
+            # Ažuriraj original samo za poslana polja
+            for k in minimal:
+                self.original_record[k] = deepcopy(minimal[k])
+            return {"ok": True}
+        return {"ok": False, "message": msg2}
 
     async def _modify(self, mods):
         await self.load()
@@ -598,7 +635,14 @@ class CPM1Client:
         lvl = [0] + [120 if i==43 else 1 for i in range(1,201)]
         return await self._modify({"LevelsDoneTime": lvl})
 
-    async def unlock_all_cars(self):
+    # ═══════════════════════════════════════════
+    #  v2.6 FIX: unlock_all_cars - minimalni payload
+    # ═══════════════════════════════════════════
+    async def unlock_all_cars(self, allData_empty=False):
+        """
+        v2.6: Šalje SAMO boughtFsos i fcar (minimalni payload).
+        Ako allData_empty=True, šalje se i prazan allData string.
+        """
         await self.load()
         d = deepcopy(self.record)
         if not d or not d.get("Name"): 
@@ -607,9 +651,6 @@ class CPM1Client:
         NO_CAR = {16,25,26,33,34,36,38,46,50,52,56,63,64,67,68,69,71,72,73,
                   75,78,79,80,83,84,90,91,92,93,94,95,96,97,98,263,265,266,267,268}
         VALID_IDS = sorted([i for i in range(0, 274) if i not in NO_CAR])
-
-        # NE DIRAJ allData - to je hash/string koji igrica koristi interno
-        # d["allData"] ostaje kakav jest
 
         # Postavi OBA polja za auta
         current_bought = set(d.get("boughtFsos", []))
@@ -620,27 +661,23 @@ class CPM1Client:
         current_fcar.update(VALID_IDS)
         d["fcar"] = sorted(current_fcar)
 
-        # carIDnStatus - ako postoji, nadopuni ga
-        cid = d.get("carIDnStatus")
-        if cid:
-            ids = list(cid.get("carGeneratedIDs", []))
-            status = list(cid.get("carStatus", []))
-            target = len(d["fcar"])
-            while len(ids) < target:
-                ids.append(f"cpm_{len(ids):04d}")
-                status.append(1)
-            d["carIDnStatus"] = {
-                "carGeneratedIDs": ids[:target],
-                "carStatus": status[:target]
-            }
-
+        # Pripremi listu polja za slanje
+        fields_to_send = ['boughtFsos', 'fcar']
+        
+        # NE DIRAJ allData - po defaultu ga ne šaljemo
         print(f"    [DEBUG] boughtFsos: {len(d['boughtFsos'])}")
         print(f"    [DEBUG] fcar: {len(d['fcar'])}")
-        print(f"    [DEBUG] carIDnStatus: {len(d['carIDnStatus']['carStatus']) if d.get('carIDnStatus') else 'None'}")
         print(f"    [DEBUG] allData: {repr(d['allData'][:20]) if d.get('allData') else 'None'} (NE DIRAM)")
 
-        # KORISTI _save_force da se pošalju SVA polja
-        result = await self._save_force(d)
+        # Ako je uključena opcija, pošalji i prazan allData
+        if allData_empty:
+            d['allData'] = ''
+            fields_to_send.append('allData')
+            print(f"    [DEBUG] allData postavljen na PRAZAN string")
+
+        # KORISTI _save_minimal da se pošalju SAMO navedena polja
+        result = await self._save_minimal(d, fields_to_send)
+        
         if result.get("ok"):
             print(f"    [DEBUG] ✅ Save uspješan! ZATVORI IGRICU POTPUNO pa je ponovo otvori.")
         else:
@@ -727,7 +764,7 @@ def banner():
   ██║     ██╔═══╝ ██║╚██╔╝██║       ██║   ██║   ██║██║   ██║██║     
   ╚██████╗██║     ██║ ╚═╝ ██║       ██║   ╚██████╔╝╚██████╔╝███████╗
    ╚═════╝╚═╝     ╚═╝     ╚═╝       ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝
-                    CPM1 All-In-One Tool v2.5
+                    CPM1 All-In-One Tool v2.6
 """)
 
 def fmt(n): return f"{int(n):,}"
@@ -795,6 +832,7 @@ async def main():
 │  [18] 🔧 Fix Account Bugs              │
 │  [19] 🚀 ★ UNLOCK EVERYTHING ★        │
 │  [20] 🔄 Refresh Account Data           │
+│  [30] 🚗 Unlock Cars + Clear allData   │
 │  [0]  🚪 Exit                          │
 └────────────────────────────────────────┘""")
         choice = input("> ").strip()
@@ -813,9 +851,14 @@ async def main():
             print_result(r.get("ok"), "COINS SET", f"🪙 {fmt(500_000)} coins")
 
         elif choice == "3":
-            print("[+] Unlocking all cars...")
+            print("[+] Unlocking all cars (minimal payload)...")
             r = await client.unlock_all_cars()
             print_result(r.get("ok"), "ALL CARS UNLOCKED")
+
+        elif choice == "30":
+            print("[+] Unlocking all cars + clearing allData...")
+            r = await client.unlock_all_cars(allData_empty=True)
+            print_result(r.get("ok"), "ALL CARS + allData CLEARED")
 
         elif choice == "4":
             print("[+] Unlocking wheels...")
