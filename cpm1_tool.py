@@ -19,21 +19,16 @@ import base64
 import brotli
 import hashlib
 import json
-import re
 import struct
 import sys
-import time
 import zlib
 from copy import deepcopy
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 try:
     from Crypto.Cipher import AES
     from Crypto.Util.Padding import unpad
-    HAS_CRYPTO = True
 except ImportError:
-    HAS_CRYPTO = False
     print("[!] Install pycryptodome: pip install pycryptodome")
     sys.exit(1)
 
@@ -72,12 +67,9 @@ def xor_bytes(data: bytes, key: bytes) -> bytes:
     return bytes(data[i] ^ key[i % len(key)] for i in range(len(data)))
 
 def decompress(data: bytes) -> Optional[bytes]:
-    try: return brotli.decompress(data)
-    except: pass
-    try: return zlib.decompress(data, zlib.MAX_WBITS | 16)
-    except: pass
-    try: return zlib.decompress(data)
-    except: pass
+    for fn in (brotli.decompress, lambda x: zlib.decompress(x, zlib.MAX_WBITS | 16), zlib.decompress):
+        try: return fn(data)
+        except: pass
     return None
 
 def decrypt_aes(data: bytes, key: bytes) -> Optional[bytes]:
@@ -340,7 +332,7 @@ FIELD_MAPPING = [
 
 INT_LIST_FIELDS   = {6,7,8,12,13,14,15,16,18,46,48}
 FLOAT_LIST_FIELDS = {10,11}
-ALWAYS_SEND       = {"allData"}
+ALWAYS_SEND       = set()
 
 
 def _field_modified(nv, ov):
@@ -384,17 +376,12 @@ def build_payload(record, uid, original=None):
     for fid, key in FIELD_MAPPING:
         value = record.get(key)
         if value is None: continue
-        
-        # Forsiraj slanje allData ako postoji u recordu (čak i prazan string)
-        if key == "allData":
-            should = True
-        elif key in ALWAYS_SEND:
+        if key in ALWAYS_SEND:
             should = isinstance(value, str) and len(value) > 0
         elif original is not None:
             should = _field_modified(value, original.get(key))
         else:
             should = True
-            
         if not should: continue
         raw = serialize_field(fid, value)
         if raw is not None: fields.append((fid, raw))
@@ -614,49 +601,37 @@ class CPM1Client:
         if not d or not d.get("Name"): 
             return {"ok":False,"message":"Could not load account data."}
         
-        # "no car" slotovi s tvog videa (brojevi koji nemaju auto)
+        # "no car" slotovi s tvog videa
         NO_CAR = {16,25,26,33,34,36,38,46,50,52,56,63,64,67,68,69,71,72,73,
                   75,78,79,80,83,84,90,91,92,93,94,95,96,97,98,263,265,266,267,268}
         
-        # Svi validni ID-jevi od 0 do 273 + 600 (nissan 400z)
-        VALID_IDS = sorted([i for i in range(0, 274) if i not in NO_CAR] + [600])
+        # Svi validni ID-jevi od 0 do 273
+        VALID_IDS = sorted([i for i in range(0, 274) if i not in NO_CAR])
         
-        # 1. boughtFsos = GLAVNO polje za vlasništvo (KLJUČNO!)
+        # boughtFsos = GLAVNO polje za vlasništvo nad autima
         current_bought = set(d.get("boughtFsos", []))
         current_bought.update(VALID_IDS)
         d["boughtFsos"] = sorted(current_bought)
         
-        # 2. fcar = isto kao boughtFsos (za svaki slučaj)
+        # fcar = favorite cars (isto postavimo da budu svi)
         d["fcar"] = list(d["boughtFsos"])
         
-        # 3. carIDnStatus - MORA postojati i biti točne dužine
-        cid = d.get("carIDnStatus")
-        if not cid:
-            cid = {"carGeneratedIDs": [], "carStatus": []}
+        # KLJUČNO: Ne šalji allData, neka server koristi individualna polja
+        d["allData"] = None
         
-        ids = list(cid.get("carGeneratedIDs", []))
-        status = list(cid.get("carStatus", []))
-        target = len(d["boughtFsos"])
+        # Ne diraj carIDnStatus, ostavi kakav jest u originalu
+        # (ako ga nema, ostavi None)
         
-        while len(ids) < target:
-            ids.append(f"cpm_{len(ids):04d}")
-            status.append(1)  # 1 = otključan/aktivan
-            
-        d["carIDnStatus"] = {
-            "carGeneratedIDs": ids[:target],
-            "carStatus": status[:target]
-        }
-        
-        # 4. KLJUČNO: Očisti allData da server koristi individualna polja
-        # allData je blob koji override-a sve ostalo ako nije prazan
-        d["allData"] = ""
-        
-        print(f"    [DEBUG] Unlocking {len(VALID_IDS)} valid car IDs...")
-        print(f"    [DEBUG] boughtFsos: {len(d['boughtFsos'])} | carIDnStatus: {len(d['carIDnStatus']['carStatus'])}")
+        print(f"    [DEBUG] Slanje {len(VALID_IDS)} auta...")
+        print(f"    [DEBUG] boughtFsos count: {len(d['boughtFsos'])}")
+        print(f"    [DEBUG] fcar count: {len(d['fcar'])}")
+        print(f"    [DEBUG] allData: {d['allData']} (ne šalje se)")
         
         result = await self._save(d)
         if result.get("ok"):
-            print(f"    [DEBUG] ✅ Save uspješan! Restartuj igricu.")
+            print(f"    [DEBUG] ✅ Save uspješan!")
+            print(f"    [DEBUG] ZATVORI IGRICU POTPUNO (swipe away)")
+            print(f"    [DEBUG] Pa ponovo otvori. Auta bi trebala biti u garaži.")
         else:
             print(f"    [DEBUG] ❌ Save failed: {result.get('message')}")
         return result
@@ -741,7 +716,7 @@ def banner():
   ██║     ██╔═══╝ ██║╚██╔╝██║       ██║   ██║   ██║██║   ██║██║     
   ╚██████╗██║     ██║ ╚═╝ ██║       ██║   ╚██████╔╝╚██████╔╝███████╗
    ╚═════╝╚═╝     ╚═╝     ╚═╝       ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝
-                    CPM1 All-In-One Tool v2.2
+                    CPM1 All-In-One Tool v2.3
 """)
 
 def fmt(n): return f"{int(n):,}"
@@ -757,7 +732,6 @@ async def main():
     clear(); banner()
     client = CPM1Client()
 
-    # Login
     email = input("[?] CPM Email: ").strip()
     password = input("[?] Password:  ").strip()
     print("\n[+] Logging in...")
@@ -767,7 +741,6 @@ async def main():
         return
     print(f"[+] Logged in! UID: {client.firebase_uid}")
 
-    # Load account
     print("[+] Loading account data...")
     if not await client.load(force=True):
         print("[!] Failed to load account data.")
