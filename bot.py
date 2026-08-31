@@ -52,8 +52,8 @@ from aiogram.types import (
 
 # Credentials should be supplied through environment variables.
 # The old inline secrets were exposed in the uploaded source and should be rotated.
-BOT_TOKEN = "8800278295:AAHFp0rFdSEEnMNKkYUzO2gmFyAY9pUqHGk"
-OWNER_ID  = 8884756222
+BOT_TOKEN = "8620658764:AAGgp-dwv_EluCzp8L5Tb2K21cLd9PvJUhg"
+OWNER_ID  = 7549920418
 
 RATE_LIMIT_ACTIONS = 10
 RATE_LIMIT_SECONDS = 60
