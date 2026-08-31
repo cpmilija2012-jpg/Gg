@@ -2207,7 +2207,7 @@ class T:
 
         return (
             f"{B}\n"
-            f"  ╭───────── ◆ 🔥 <b>MasKyyOFFC BOT</b> ◆ ──────────╮\n"
+            f"  ╭───────── ◆ 🔥 <b>@ILIJASELLOFFC BOT</b> ◆ ──────────╮\n"
             f"  │\n"
             f"  │  ✨ <b>{tr(uid, "welcome")}</b> ✨\n"
             f"  │\n"
@@ -2225,10 +2225,10 @@ class T:
             f"  💡 <b>{tr(uid, "next")}</b>\n"
             f"  ▸ {tr(uid, "signin")}\n"
             f"  ▸ {tr(uid, "email")}\n\n"
-            f"  ⚡ <i>MasKyyOFFC • Fast • Secure • Reliable</i>"
+            f"  ⚡ <i>@ILIJASELLOFFC • Fast • Secure • Reliable</i>"
             f"  ───────────────────────────────────────────\n"
             f"  👨‍💻 <b>Developer BOT Owner</b>\n"
-            f"  🛡️ <b>MasKyy</b>  (<a href=\"https://t.me/MasKyyOfficial\">@MasKyyOfficial</a>)"
+            f"  🛡️ <b>@ILIJASELL</b>  (<a href=\"https://t.me/@ILIJASELLOfficial\">@@ILIJASELLOfficial</a>)"
         )
 
     @staticmethod
@@ -5630,7 +5630,7 @@ async def p_profile_id(msg: Message, state: FSMContext):
     warns = store_get_warnings(uid)
     note  = store_get_note(uid)
     txt   = (
-        f"{B}\n  ℹ  𝗣𝗥𝗢𝗙𝗜𝗟𝗘 𝗕𝗢𝗧 𝗠𝗔𝗦𝗞𝗬\n{B}\n\n"
+        f"{B}\n  ℹ  𝗣𝗥𝗢𝗙𝗜𝗟𝗘 𝗕𝗢𝗧 ILIJA\n{B}\n\n"
         f"  👤 Name:     {name}\n"
         f"  📱 Username: @{un}\n"
         f"  🆔 ID:       <code>{uid}</code>\n"
@@ -5720,14 +5720,14 @@ async def p_upload_photo(msg: Message, state: FSMContext):
 
 
 # ═══════════════════════════════════════════
-#  📢 BROADCAST MasKyyOFFC
+#  📢 BROADCAST @ILIJASELLOFFC
 # ═══════════════════════════════════════════
 
 @rt.callback_query(F.data == "a_bcast_menu")
 async def cb_bcast_menu(cb: CallbackQuery):
     if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
     await safe_edit_callback(cb, 
-        f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 𝗠𝗔𝗦𝗞𝗬\n{B}\n\n"
+        f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ILIJA\n{B}\n\n"
         f"  👥 All: {len(ALLOWED_USERS)}  💎 VIP: {len(VIP_USERS)}",
         reply_markup=K.broadcast_menu())
     await cb.answer()
@@ -5738,7 +5738,7 @@ async def cb_bcast_text(cb: CallbackQuery, state: FSMContext):
     if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
     await state.update_data(bcast_target="all")
     await state.set_state(SAdmin.bcast_text)
-    await safe_edit_callback(cb, hdr("📢","𝗧𝗘𝗫𝗧 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 𝗠𝗔𝗦𝗞𝗬")+f"\n\n  Message to all {len(ALLOWED_USERS)} users:", reply_markup=K.back_admin())
+    await safe_edit_callback(cb, hdr("📢","𝗧𝗘𝗫𝗧 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ILIJA")+f"\n\n  Message to all {len(ALLOWED_USERS)} users:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -5747,7 +5747,7 @@ async def cb_bcast_vip(cb: CallbackQuery, state: FSMContext):
     if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
     await state.update_data(bcast_target="vip")
     await state.set_state(SAdmin.bcast_text)
-    await safe_edit_callback(cb, hdr("💎","𝗩𝗜𝗣 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 𝗠𝗔𝗦𝗞𝗬")+f"\n\n  Message to {len(VIP_USERS)} VIPs:", reply_markup=K.back_admin())
+    await safe_edit_callback(cb, hdr("💎","𝗩𝗜𝗣 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ILIJA")+f"\n\n  Message to {len(VIP_USERS)} VIPs:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -5756,7 +5756,7 @@ async def cb_bcast_photo(cb: CallbackQuery, state: FSMContext):
     if not has_admin(cb.from_user.id,"superadmin"): await cb.answer("✗",show_alert=True); return
     await state.update_data(bcast_target="all")
     await state.set_state(SAdmin.bcast_photo)
-    await safe_edit_callback(cb, hdr("🖼","𝗣𝗛𝗢𝗧𝗢 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 𝗠𝗔𝗦𝗞𝗬")+"\n\n  Send a photo:", reply_markup=K.back_admin())
+    await safe_edit_callback(cb, hdr("🖼","𝗣𝗛𝗢𝗧𝗢 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ILIJA")+"\n\n  Send a photo:", reply_markup=K.back_admin())
     await cb.answer()
 
 
@@ -5781,7 +5781,7 @@ async def p_bcast_photo_cap(msg: Message, state: FSMContext):
     photo   = d.get("bcast_photo_id","")
     target  = d.get("bcast_target","all")
     targets = VIP_USERS if target=="vip" else ALLOWED_USERS
-    bc_cap  = f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 𝗠𝗔𝗦𝗞𝗬\n{B}\n\n  {caption}"
+    bc_cap  = f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ILIJA\n{B}\n\n  {caption}"
     s=f=0
     for uid in list(targets):
         try: await bot.send_photo(uid, photo=photo, caption=bc_cap); s+=1
@@ -5800,7 +5800,7 @@ async def p_bcast_text(msg: Message, state: FSMContext):
     txt     = msg.text.strip()
     target  = d.get("bcast_target","all")
     targets = VIP_USERS if target=="vip" else ALLOWED_USERS
-    bc = f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 𝗠𝗔𝗦𝗞𝗬\n{B}\n\n  {txt}"
+    bc = f"{B}\n  📢  𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ILIJA\n{B}\n\n  {txt}"
     s=f=0
     for uid in list(targets):
         try: await bot.send_message(uid, bc); s+=1
@@ -5978,7 +5978,7 @@ async def main():
     START_TIME = time.time()
 
     log.info("━"*40)
-    log.info("  🔥 𝗕𝗢𝗧 𝗠𝗮𝘀𝗞𝘆𝘆𝗢𝗙𝗙𝗖 🔥")
+    log.info("  🔥 𝗕𝗢𝗧 ILIJASELL 🔥")
     log.info(f"  Owner:  {OWNER_ID}")
     log.info(f"  Users:  {len(ALLOWED_USERS)}")
     log.info(f"  Brotli: {'✔' if HAS_BROTLI else '✗ pip install brotli'}")
