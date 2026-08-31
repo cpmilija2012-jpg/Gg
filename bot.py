@@ -10,6 +10,32 @@ import hashlib
 import traceback
 import logging
 import os
+import os
+from flask import Flask
+import threading
+
+# === FLASK HEALTH CHECK ZA RENDER ===
+app = Flask(__name__)
+
+@app.route('/')
+def health():
+    return "Bot is running", 200
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, threaded=True)
+
+# Pokreni Flask u pozadinskoj niti da Render vidi otvoren port
+threading.Thread(target=run_web, daemon=True).start()
+# =====================================
+
+# --- tvoj postojeći kod za pokretanje bota ---
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
 from copy import deepcopy
 from html import escape
 from datetime import datetime, timedelta
