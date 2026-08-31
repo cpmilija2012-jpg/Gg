@@ -29,12 +29,6 @@ def run_web():
 threading.Thread(target=run_web, daemon=True).start()
 # =====================================
 
-# --- tvoj postojeći kod za pokretanje bota ---
-async def main():
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
 
 from copy import deepcopy
 from html import escape
