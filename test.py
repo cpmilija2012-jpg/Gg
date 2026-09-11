@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
     print("👑 Postavljam King Rank...")
     set_king_rank(token)
-#Primerak skripte koja lepo radi samo sto je za cpm1        self.uid = uid
+        self.uid = uid
         self.headers = {
             "Authorization": f"Bearer {token}",
             "X-Firebase-Token": token,
